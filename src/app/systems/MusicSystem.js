@@ -9,13 +9,10 @@ export class MusicSystem {
     this.compressor = null;
     this.started = false;
     this.enabled = true;
-    this.nextPulse = 0;
     this.lastFootstep = 0;
     this.padLfos = [];
-    this.baseGain = 0.44;
+    this.baseGain = 0.3;
     this.noiseBuffer = null;
-    this.bassOsc = null;
-    this.bassGain = null;
   }
 
   notifyStateChange() {
@@ -36,7 +33,7 @@ export class MusicSystem {
       this.master.gain.value = 0;
 
       this.musicBus = this.ctx.createGain();
-      this.musicBus.gain.value = 1.38;
+      this.musicBus.gain.value = 1.1;
 
       this.fxBus = this.ctx.createGain();
       this.fxBus.gain.value = 1.95;
@@ -73,8 +70,7 @@ export class MusicSystem {
       return;
     }
 
-    this.startPad(174.61, 220.0, 261.63, 329.63);
-    this.startBass();
+    this.startAmbientPad(98.0, 130.81, 164.81);
     this.started = true;
     this.applyMuteState(true);
   }
@@ -111,7 +107,7 @@ export class MusicSystem {
     }
   }
 
-  startPad(...freqs) {
+  startAmbientPad(...freqs) {
     if (!this.ctx || !this.musicBus) {
       return;
     }
@@ -120,48 +116,24 @@ export class MusicSystem {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       const filter = this.ctx.createBiquadFilter();
-      const lfo = this.ctx.createOscillator();
-      const lfoGain = this.ctx.createGain();
+      const now = this.ctx.currentTime;
 
-      osc.type = index % 2 === 0 ? 'triangle' : 'sine';
+      osc.type = 'sine';
       osc.frequency.value = freq;
+
       filter.type = 'lowpass';
-      filter.frequency.value = 580 + index * 95;
-      gain.gain.value = 0.026 + index * 0.006;
-      lfo.type = 'sine';
-      lfo.frequency.value = 0.08 + index * 0.03;
-      lfoGain.gain.value = 18 + index * 4;
-      lfo.connect(lfoGain);
-      lfoGain.connect(filter.frequency);
+      filter.frequency.value = 170 + index * 35;
+      filter.Q.value = 0.12;
+
+      const targetGain = [0.034, 0.02, 0.013][index] ?? 0.01;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(targetGain, now + 3.2 + index * 0.35);
+
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(this.musicBus);
       osc.start();
-      lfo.start();
-      this.padLfos.push(lfo);
     });
-  }
-
-  startBass() {
-    if (!this.ctx || !this.musicBus) {
-      return;
-    }
-
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    const filter = this.ctx.createBiquadFilter();
-
-    osc.type = 'sawtooth';
-    osc.frequency.value = 55;
-    filter.type = 'lowpass';
-    filter.frequency.value = 260;
-    gain.gain.value = 0;
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.musicBus);
-    osc.start();
-    this.bassOsc = osc;
-    this.bassGain = gain;
   }
 
   pulse(now, freq, length = 0.28, volume = 0.034, type = 'triangle', targetBus = this.musicBus) {
@@ -331,19 +303,6 @@ export class MusicSystem {
     }
 
     const now = this.ctx.currentTime;
-
-    if (this.bassGain) {
-      const target = movingFast ? 0.09 : 0.04;
-      this.bassGain.gain.cancelScheduledValues(now);
-      this.bassGain.gain.linearRampToValueAtTime(target, now + 0.12);
-    }
-
-    if (now >= this.nextPulse) {
-      const motif = [392, 523.25, 659.25, 523.25];
-      const note = motif[Math.floor((now * 2) % motif.length)];
-      this.pulse(now, note, 0.26, movingFast ? 0.048 : 0.036, movingFast ? 'sawtooth' : 'triangle');
-      this.nextPulse = now + (movingFast ? 0.34 : 0.52);
-    }
 
     if (movingFast) {
       this.footstep(now);
