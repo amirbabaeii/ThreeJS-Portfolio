@@ -41,6 +41,13 @@ export const CAMERA_DEFAULTS = {
   },
 };
 
+export const RESTART_CINEMATIC = {
+  duration: 3.6,
+  arcHeight: 15,
+  driftX: 5.5,
+  targetLift: 4.2,
+};
+
 export const WORLD_LAYOUT = {
   roadHalfWidth: 18,
   minPlayerZ: -6,

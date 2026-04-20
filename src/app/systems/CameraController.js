@@ -15,6 +15,21 @@ export class CameraController {
     this.offset = new THREE.Vector3();
   }
 
+  getDefaultPose(playerPosition) {
+    const target = new THREE.Vector3(
+      playerPosition.x,
+      playerPosition.y + CAMERA_DEFAULTS.targetHeight,
+      playerPosition.z,
+    );
+    const position = this.computeDesiredPosition(target, {
+      yaw: CAMERA_DEFAULTS.yaw,
+      pitch: CAMERA_DEFAULTS.pitch,
+      distance: CAMERA_DEFAULTS.distance,
+    }).clone();
+
+    return { position, target };
+  }
+
   applyOrbit(dx, dy) {
     this.yaw -= dx * CAMERA_DEFAULTS.orbitSensitivity.x;
     this.pitch = clamp(
@@ -24,14 +39,20 @@ export class CameraController {
     );
   }
 
-  computeDesiredPosition(target) {
-    const pitch = clamp(this.pitch, CAMERA_DEFAULTS.minPitch, CAMERA_DEFAULTS.maxPitch);
+  computeDesiredPosition(target, override = null) {
+    const yaw = override?.yaw ?? this.yaw;
+    const distance = override?.distance ?? this.distance;
+    const pitch = clamp(
+      override?.pitch ?? this.pitch,
+      CAMERA_DEFAULTS.minPitch,
+      CAMERA_DEFAULTS.maxPitch,
+    );
 
     this.offset.set(
-      Math.sin(this.yaw) * Math.cos(pitch),
+      Math.sin(yaw) * Math.cos(pitch),
       Math.sin(-pitch),
-      Math.cos(this.yaw) * Math.cos(pitch),
-    ).multiplyScalar(this.distance);
+      Math.cos(yaw) * Math.cos(pitch),
+    ).multiplyScalar(distance);
 
     return this.desiredPosition.copy(target).add(this.offset);
   }

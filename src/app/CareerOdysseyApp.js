@@ -6,12 +6,25 @@ import { MusicSystem } from './systems/MusicSystem.js';
 import { PlayerController } from './systems/PlayerController.js';
 import { AppUI } from './ui/AppUI.js';
 import { CareerWorld } from './world/CareerWorld.js';
-import { RENDERER_CONFIG, SCENE_CONFIG } from './config.js';
+import {
+  PLAYER_DEFAULTS,
+  RENDERER_CONFIG,
+  RESTART_CINEMATIC,
+  SCENE_CONFIG,
+} from './config.js';
 
 function nextFrame() {
   return new Promise((resolve) => {
     requestAnimationFrame(resolve);
   });
+}
+
+function easeInOutCubic(value) {
+  if (value < 0.5) {
+    return 4 * value * value * value;
+  }
+
+  return 1 - ((-2 * value + 2) ** 3) / 2;
 }
 
 export class CareerOdysseyApp {
@@ -38,7 +51,15 @@ export class CareerOdysseyApp {
       completed: false,
       nearest: null,
       hoveredMonument: null,
+      restartCinematic: null,
     };
+    this.restartSpawnPosition = new THREE.Vector3(
+      PLAYER_DEFAULTS.startPosition.x,
+      PLAYER_DEFAULTS.startPosition.y,
+      PLAYER_DEFAULTS.startPosition.z,
+    );
+    this.tmpCinematicPosition = new THREE.Vector3();
+    this.tmpCinematicTarget = new THREE.Vector3();
 
     this.world = new CareerWorld({
       scene: this.scene,
@@ -156,21 +177,16 @@ export class CareerOdysseyApp {
   }
 
   async restartJourney() {
+    if (this.state.restartCinematic) {
+      return;
+    }
+
     await this.music.start();
-    this.state.started = true;
-    this.state.completed = false;
-    this.state.nearest = null;
-    this.state.hoveredMonument = null;
-    this.input.reset();
-    this.world.reset();
-    this.player.reset();
-    this.cameraController.reset(this.player.position);
     this.ui.hideFinish();
-    this.ui.showHud();
-    this.ui.setSpawnDetails();
-    this.refreshProgress();
-    this.refreshObjective();
-    this.ui.showToast('Journey restarted');
+    this.ui.hideHud();
+    this.ui.setInteractionHintVisible(false);
+    this.beginRestartCinematic();
+    this.ui.showToast('Flying back to the start line');
   }
 
   refreshProgress() {
@@ -229,6 +245,8 @@ export class CareerOdysseyApp {
 
   completeJourney() {
     this.state.completed = true;
+    this.state.nearest = null;
+    this.state.hoveredMonument = null;
     this.music.playPortal();
     this.refreshObjective();
     this.ui.showFinish(this.getFinishCopy());
@@ -281,10 +299,75 @@ export class CareerOdysseyApp {
     }
   }
 
+  beginRestartCinematic() {
+    const defaultPose = this.cameraController.getDefaultPose(this.restartSpawnPosition);
+
+    this.state.restartCinematic = {
+      elapsed: 0,
+      duration: RESTART_CINEMATIC.duration,
+      fromPosition: this.camera.position.clone(),
+      toPosition: defaultPose.position,
+      fromTarget: this.cameraController.target.clone(),
+      toTarget: defaultPose.target,
+    };
+    this.state.started = false;
+    this.state.nearest = null;
+    this.state.hoveredMonument = null;
+    this.input.reset();
+  }
+
+  finalizeRestartJourney() {
+    this.state.restartCinematic = null;
+    this.state.started = true;
+    this.state.completed = false;
+    this.state.nearest = null;
+    this.state.hoveredMonument = null;
+    this.input.reset();
+    this.world.reset();
+    this.player.reset();
+    this.cameraController.reset(this.player.position);
+    this.ui.showHud();
+    this.ui.setSpawnDetails();
+    this.refreshProgress();
+    this.refreshObjective();
+    this.ui.showToast('Journey restarted');
+  }
+
+  updateRestartCinematic(dt) {
+    const cinematic = this.state.restartCinematic;
+
+    if (!cinematic) {
+      return;
+    }
+
+    cinematic.elapsed = Math.min(cinematic.elapsed + dt, cinematic.duration);
+    const progress = cinematic.elapsed / cinematic.duration;
+    const easedProgress = easeInOutCubic(progress);
+    const arc = Math.sin(progress * Math.PI);
+
+    this.tmpCinematicPosition.lerpVectors(cinematic.fromPosition, cinematic.toPosition, easedProgress);
+    this.tmpCinematicPosition.y += arc * RESTART_CINEMATIC.arcHeight;
+    this.tmpCinematicPosition.x += Math.sin(progress * Math.PI * 1.25) * RESTART_CINEMATIC.driftX * (1 - easedProgress);
+    this.tmpCinematicPosition.z -= arc * 3.5;
+
+    this.tmpCinematicTarget.lerpVectors(cinematic.fromTarget, cinematic.toTarget, easedProgress);
+    this.tmpCinematicTarget.y += arc * RESTART_CINEMATIC.targetLift;
+    this.tmpCinematicTarget.z += arc * 6;
+
+    this.camera.position.copy(this.tmpCinematicPosition);
+    this.camera.lookAt(this.tmpCinematicTarget);
+
+    if (progress >= 1) {
+      this.finalizeRestartJourney();
+    }
+  }
+
   animate(time) {
     const dt = Math.min(this.clock.getDelta(), 0.05);
 
-    if (this.state.started && !this.state.completed) {
+    if (this.state.restartCinematic) {
+      this.updateRestartCinematic(dt);
+    } else if (this.state.started && !this.state.completed) {
       this.player.update({
         dt,
         input: this.input,
@@ -306,7 +389,9 @@ export class CareerOdysseyApp {
       this.input.clearQueuedActions();
     }
 
-    this.cameraController.update(this.player.position, dt);
+    if (!this.state.restartCinematic) {
+      this.cameraController.update(this.player.position, dt);
+    }
     this.world.updateAnimations({
       time,
       dt,
