@@ -39,6 +39,7 @@ canvas {
   position: fixed;
   inset: 0;
   display: block;
+  touch-action: none;
 }
 
 button,
@@ -175,6 +176,12 @@ input {
 .primary-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 22px 42px rgba(125, 211, 252, 0.42);
+}
+
+.primary-button:focus-visible,
+.music-button:focus-visible {
+  outline: 2px solid #d6f5ff;
+  outline-offset: 4px;
 }
 
 .controls-inline {

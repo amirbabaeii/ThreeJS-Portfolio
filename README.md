@@ -1,13 +1,12 @@
 # Amir Babaei — Career Odyssey
 
-A premium Three.js mini-game that turns Amir Babaei's CV into an interactive career review.
+A Three.js mini-game that turns my CV into an interactive career review.
 
 ## Features
 
+- Modular Three.js architecture with dedicated app, world, player, camera, input, audio, and UI layers
 - Smooth third-person movement with camera-relative controls
-- Correct arrow-key mapping: **Up = forward**, **Down = backward**
-- Responsive sprint and jump
-- `Enter` interaction for monuments, LinkedIn, GitHub, and the final portal
+- Responsive sprint, jump, interaction, and orbit camera handling
 - Lightweight synth soundtrack generated with the Web Audio API
 - Loading screen with staged world boot-up
 - Glowing CV monuments for experience and education
@@ -36,6 +35,23 @@ npm run build
 npm run preview
 ```
 
+## Project structure
+
+```text
+src/
+  app/
+    CareerOdysseyApp.js
+    config.js
+    data/
+    systems/
+    ui/
+    utils/
+    world/
+  cvData.js
+  main.js
+  style.css
+```
+
 ## Notes
 
-This project uses only lightweight geometry and generated UI/audio so it stays portable and easy to customize.
+The original single-file scene bootstrap has been split into focused modules so gameplay and presentation logic can evolve independently. Runtime milestone state is now cloned from the static CV data instead of mutating the source dataset directly.
