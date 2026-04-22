@@ -185,12 +185,14 @@ export class CareerWorld {
 
   createParticleField() {
     const count = 700;
+    const minY = 0.6;
+    const maxY = 12;
     const positions = new Float32Array(count * 3);
     const speeds = new Float32Array(count);
 
     for (let index = 0; index < count; index += 1) {
       positions[index * 3] = (Math.random() - 0.5) * 56;
-      positions[index * 3 + 1] = 0.5 + Math.random() * 10;
+      positions[index * 3 + 1] = minY + Math.random() * (maxY - minY);
       positions[index * 3 + 2] = Math.random() * 212;
       speeds[index] = 0.2 + Math.random() * 0.7;
     }
@@ -206,6 +208,29 @@ export class CareerWorld {
       opacity: 0.85,
       depthWrite: false,
     });
+
+    // Move the per-frame rise animation to the GPU so the CPU no longer
+    // rewrites 700 vertices + re-uploads the buffer every frame.
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = { value: 0 };
+      shader.uniforms.uMinY = { value: minY };
+      shader.uniforms.uRange = { value: maxY - minY };
+      shader.vertexShader = `
+        uniform float uTime;
+        uniform float uMinY;
+        uniform float uRange;
+        attribute float speed;
+        ${shader.vertexShader}
+      `.replace(
+        '#include <begin_vertex>',
+        `
+          vec3 transformed = position;
+          float relY = transformed.y - uMinY;
+          transformed.y = uMinY + mod(relY + speed * uTime, uRange);
+        `,
+      );
+      material.userData.shader = shader;
+    };
 
     this.particles = new THREE.Points(geometry, material);
     this.scene.add(this.particles);
@@ -584,21 +609,11 @@ export class CareerWorld {
       return;
     }
 
-    const positions = this.particles.geometry.attributes.position;
-    const speeds = this.particles.geometry.attributes.speed;
+    const shader = this.particles.material.userData.shader;
 
-    for (let index = 0; index < positions.count; index += 1) {
-      let y = positions.getY(index);
-      y += speeds.array[index] * dt;
-
-      if (y > 12) {
-        y = 0.6;
-      }
-
-      positions.setY(index, y);
+    if (shader) {
+      shader.uniforms.uTime.value += dt;
     }
-
-    positions.needsUpdate = true;
   }
 
   updateAnimations({ time, dt, nextMilestone }) {

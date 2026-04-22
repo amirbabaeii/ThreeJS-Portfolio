@@ -61,6 +61,8 @@ export class CareerOdysseyApp {
     );
     this.tmpCinematicPosition = new THREE.Vector3();
     this.tmpCinematicTarget = new THREE.Vector3();
+    this.targetCheckAccumulator = 0;
+    this.targetCheckInterval = 1 / 16;
 
     this.world = new CareerWorld({
       scene: this.scene,
@@ -416,9 +418,19 @@ export class CareerOdysseyApp {
         onLand: (intensity) => this.music.playLand(intensity),
       });
 
-      this.updateNearestTarget();
+      this.targetCheckAccumulator += dt;
+
+      if (this.targetCheckAccumulator >= this.targetCheckInterval) {
+        this.targetCheckAccumulator = 0;
+        this.updateNearestTarget();
+      }
 
       if (this.input.consumeInteract()) {
+        // Refresh just before acting on input so the player never
+        // sees a stale "no target" message right as they press E.
+        this.updateNearestTarget();
+        this.targetCheckAccumulator = 0;
+
         if (this.state.nearest) {
           this.interactWithNearest();
           this.ui.openDetails();
