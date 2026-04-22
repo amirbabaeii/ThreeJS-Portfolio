@@ -52,6 +52,7 @@ export class CareerOdysseyApp {
       nearest: null,
       hoveredMonument: null,
       restartCinematic: null,
+      inspectedTarget: null,
     };
     this.restartSpawnPosition = new THREE.Vector3(
       PLAYER_DEFAULTS.startPosition.x,
@@ -76,7 +77,18 @@ export class CareerOdysseyApp {
       canvas: this.ui.canvas,
       onOrbit: (dx, dy) => this.cameraController.applyOrbit(dx, dy),
       onToggleMusic: () => this.music.toggle(),
+      mobile: {
+        joystick: this.ui.joystick,
+        knob: this.ui.joystickKnob,
+        jumpButton: this.ui.jumpButton,
+        interactButton: this.ui.interactButton,
+        sprintButton: this.ui.sprintButton,
+      },
     });
+
+    if (this.isTouchDevice()) {
+      document.body.classList.add('is-touch');
+    }
 
     this.handleResize = () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -94,6 +106,9 @@ export class CareerOdysseyApp {
     this.ui.bindMusicToggle(() => {
       this.music.toggle();
     });
+    this.ui.bindDetailsClose(() => {
+      this.ui.closeDetails();
+    });
     this.ui.setMusicEnabled(this.music.enabled);
 
     window.addEventListener('resize', this.handleResize);
@@ -109,6 +124,13 @@ export class CareerOdysseyApp {
         void this.music.unlock();
       }
     });
+  }
+
+  isTouchDevice() {
+    if (typeof window === 'undefined') return false;
+    const coarsePointer = window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+    const hasTouch = 'ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0;
+    return Boolean(coarsePointer || hasTouch);
   }
 
   createRenderer(canvas) {
@@ -243,10 +265,24 @@ export class CareerOdysseyApp {
     }
   }
 
+  updateInspectionDismiss() {
+    const inspected = this.state.inspectedTarget;
+
+    if (!inspected) {
+      return;
+    }
+
+    if (this.state.nearest !== inspected) {
+      this.state.inspectedTarget = null;
+      this.ui.closeDetails();
+    }
+  }
+
   completeJourney() {
     this.state.completed = true;
     this.state.nearest = null;
     this.state.hoveredMonument = null;
+    this.state.inspectedTarget = null;
     this.music.playPortal();
     this.refreshObjective();
     this.ui.showFinish(this.getFinishCopy());
@@ -313,6 +349,7 @@ export class CareerOdysseyApp {
     this.state.started = false;
     this.state.nearest = null;
     this.state.hoveredMonument = null;
+    this.state.inspectedTarget = null;
     this.input.reset();
   }
 
@@ -322,6 +359,7 @@ export class CareerOdysseyApp {
     this.state.completed = false;
     this.state.nearest = null;
     this.state.hoveredMonument = null;
+    this.state.inspectedTarget = null;
     this.input.reset();
     this.world.reset();
     this.player.reset();
@@ -381,8 +419,16 @@ export class CareerOdysseyApp {
       this.updateNearestTarget();
 
       if (this.input.consumeInteract()) {
-        this.interactWithNearest();
+        if (this.state.nearest) {
+          this.interactWithNearest();
+          this.ui.openDetails();
+          this.state.inspectedTarget = this.state.nearest;
+        } else {
+          this.ui.showToast('Walk closer to a monument to inspect');
+        }
       }
+
+      this.updateInspectionDismiss();
 
       this.music.update(this.player.getPlanarSpeed() > 2.4 && this.player.onGround);
     } else {

@@ -47,10 +47,18 @@ export class AppUI {
     this.detailTitle = getRequiredElement(root, '#detailTitle');
     this.detailMeta = getRequiredElement(root, '#detailMeta');
     this.detailBullets = getRequiredElement(root, '#detailBullets');
+    this.detailClose = root.querySelector('#detailClose');
     this.interactionHint = getRequiredElement(root, '#interactionHint');
+    this.inspectPrompt = root.querySelector('#inspectPrompt');
     this.hintChip = getRequiredElement(root, '#hintChip');
     this.toast = getRequiredElement(root, '#toast');
     this.musicToggle = getRequiredElement(root, '#musicToggle');
+    this.mobileControls = root.querySelector('#mobileControls');
+    this.joystick = root.querySelector('#joystick');
+    this.joystickKnob = root.querySelector('#joystickKnob');
+    this.jumpButton = root.querySelector('#jumpButton');
+    this.interactButton = root.querySelector('#interactButton');
+    this.sprintButton = root.querySelector('#sprintButton');
     this.metaDescription = root.querySelector('meta[name="description"]');
     this.toastTimeout = null;
     this.heroName = '';
@@ -85,6 +93,20 @@ export class AppUI {
     this.musicToggle.addEventListener('click', handler);
   }
 
+  bindDetailsClose(handler) {
+    if (this.detailClose) {
+      this.detailClose.addEventListener('click', handler);
+    }
+  }
+
+  openDetails() {
+    this.hud.classList.add('details-open');
+  }
+
+  closeDetails() {
+    this.hud.classList.remove('details-open');
+  }
+
   updateLoading(progress, label) {
     this.loadingBar.style.width = `${progress}%`;
     this.loadingValue.textContent = `${Math.round(progress)}%`;
@@ -106,6 +128,7 @@ export class AppUI {
 
   hideHud() {
     this.hud.classList.add('hidden');
+    this.closeDetails();
   }
 
   showFinish(copy) {
@@ -133,6 +156,14 @@ export class AppUI {
 
   setInteractionHintVisible(visible) {
     this.interactionHint.classList.toggle('hidden', !visible);
+
+    if (this.inspectPrompt) {
+      this.inspectPrompt.classList.toggle('hidden', !visible);
+    }
+
+    if (this.interactButton) {
+      this.interactButton.classList.toggle('is-disabled', !visible);
+    }
   }
 
   setDetailPanel({ eyebrow, title, meta, bullets }) {
