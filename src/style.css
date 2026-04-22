@@ -462,17 +462,61 @@ input {
   background: linear-gradient(135deg, #5eead4, #c084fc, #7dd3fc);
 }
 
-.controls-inline[data-only="touch"] {
+.controls-inline[data-only="touch"],
+.controls-list[data-only="touch"] {
   display: none;
 }
 
+.controls-list {
+  margin: 0;
+  padding: 14px 18px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.controls-list li {
+  padding-left: 18px;
+  position: relative;
+}
+
+.controls-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7dd3fc, #5eead4);
+  box-shadow: 0 0 10px rgba(125, 211, 252, 0.6);
+}
+
+.controls-list li strong {
+  color: #f2fbff;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
 body.is-touch .controls-inline[data-only="keyboard"],
+body.is-touch .controls-list[data-only="keyboard"],
 body.is-touch .glass-chip[data-only="keyboard"] {
   display: none;
 }
 
 body.is-touch .controls-inline[data-only="touch"] {
   display: block;
+}
+
+body.is-touch .controls-list[data-only="touch"] {
+  display: flex;
 }
 
 body.is-touch .mobile-controls {
@@ -515,7 +559,7 @@ body.is-touch .enter-pill {
 
 body.is-touch .hero-panel {
   width: auto;
-  max-width: calc(100vw - 20px);
+  max-width: calc(100vw - 120px);
   padding: 8px 12px;
   border-radius: 18px;
 }
@@ -523,12 +567,13 @@ body.is-touch .hero-panel {
 body.is-touch .hero-stats {
   margin-top: 0;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 body.is-touch .stat-pill {
   padding: 6px 10px;
   font-size: 0.8rem;
-  max-width: 60vw;
+  max-width: calc(100vw - 140px);
   overflow: hidden;
 }
 
@@ -669,6 +714,23 @@ body.is-touch .toast.show {
   transform: translate(-50%, 0);
 }
 
+body.is-touch .overlay {
+  padding: 16px;
+}
+
+body.is-touch .overlay-card {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+body.is-touch #app:has(.overlay.visible) .mobile-controls,
+body.is-touch #app:has(.overlay.visible) .inspect-prompt,
+body.is-touch #app:has(.overlay.visible) .footer-hud {
+  display: none;
+}
+
 @keyframes sheet-rise {
   from {
     opacity: 0;
@@ -682,12 +744,17 @@ body.is-touch .toast.show {
 
 @media (hover: none) and (pointer: coarse) {
   .controls-inline[data-only="keyboard"],
+  .controls-list[data-only="keyboard"],
   .glass-chip[data-only="keyboard"] {
     display: none;
   }
 
   .controls-inline[data-only="touch"] {
     display: block;
+  }
+
+  .controls-list[data-only="touch"] {
+    display: flex;
   }
 
   .mobile-controls {
