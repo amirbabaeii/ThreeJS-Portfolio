@@ -56,8 +56,6 @@ export class AppUI {
     this.mobileControls = root.querySelector('#mobileControls');
     this.joystick = root.querySelector('#joystick');
     this.joystickKnob = root.querySelector('#joystickKnob');
-    this.jumpButton = root.querySelector('#jumpButton');
-    this.interactButton = root.querySelector('#interactButton');
     this.sprintButton = root.querySelector('#sprintButton');
     this.metaDescription = root.querySelector('meta[name="description"]');
     this.toastTimeout = null;
@@ -160,9 +158,11 @@ export class AppUI {
     if (this.inspectPrompt) {
       this.inspectPrompt.classList.toggle('hidden', !visible);
     }
+  }
 
-    if (this.interactButton) {
-      this.interactButton.classList.toggle('is-disabled', !visible);
+  bindInspectPrompt(handler) {
+    if (this.inspectPrompt) {
+      this.inspectPrompt.addEventListener('click', handler);
     }
   }
 

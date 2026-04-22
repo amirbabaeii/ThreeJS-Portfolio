@@ -640,37 +640,44 @@ body.is-touch .mobile-controls {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 18px;
+  padding: 12px 22px;
+  border: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, #7dd3fc, #5eead4, #c084fc);
   color: #051118;
   font-weight: 800;
   letter-spacing: 0.02em;
   box-shadow: 0 12px 28px rgba(125, 211, 252, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   animation: prompt-pulse 1.2s ease-in-out infinite;
+  font-family: inherit;
+}
+
+.inspect-prompt:active {
+  filter: brightness(1.12);
 }
 
 .inspect-prompt.hidden {
   display: none;
 }
 
-.inspect-prompt__key {
+.inspect-prompt__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 8px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   background: rgba(5, 17, 24, 0.85);
   color: #eaf7ff;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
+  font-size: 0.95rem;
 }
 
 .inspect-prompt__label {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .action-button.is-disabled {

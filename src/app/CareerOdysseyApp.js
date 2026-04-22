@@ -82,8 +82,6 @@ export class CareerOdysseyApp {
       mobile: {
         joystick: this.ui.joystick,
         knob: this.ui.joystickKnob,
-        jumpButton: this.ui.jumpButton,
-        interactButton: this.ui.interactButton,
         sprintButton: this.ui.sprintButton,
       },
     });
@@ -110,6 +108,9 @@ export class CareerOdysseyApp {
     });
     this.ui.bindDetailsClose(() => {
       this.ui.closeDetails();
+    });
+    this.ui.bindInspectPrompt(() => {
+      this.input.queueInteract();
     });
     this.ui.setMusicEnabled(this.music.enabled);
 

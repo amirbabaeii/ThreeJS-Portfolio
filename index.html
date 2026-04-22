@@ -56,9 +56,8 @@
             </ul>
             <ul class="controls-list" data-only="touch">
               <li><strong>Joystick</strong> — drag to move</li>
-              <li><strong>⚡ Sprint</strong> — hold to sprint</li>
-              <li><strong>▲ Jump</strong> — tap to jump</li>
-              <li><strong>E Interact</strong> — tap near a monument</li>
+              <li><strong>⚡ Speed</strong> — hold to sprint</li>
+              <li><strong>Inspect pill</strong> — tap when it appears near a monument</li>
               <li><strong>Screen swipe</strong> — orbit camera</li>
             </ul>
           </div>
@@ -108,23 +107,17 @@
         </section>
       </div>
 
-      <div id="inspectPrompt" class="inspect-prompt hidden" aria-live="polite">
-        <span class="inspect-prompt__key">E</span>
+      <button id="inspectPrompt" class="inspect-prompt hidden" type="button" aria-live="polite" aria-label="Inspect nearby monument">
+        <span class="inspect-prompt__icon">✦</span>
         <span class="inspect-prompt__label">Tap to inspect</span>
-      </div>
+      </button>
 
       <div id="mobileControls" class="mobile-controls" aria-hidden="true">
         <div id="joystick" class="joystick">
           <div class="joystick-base"></div>
           <div id="joystickKnob" class="joystick-knob"></div>
         </div>
-        <div class="action-buttons">
-          <div class="action-column">
-            <button id="interactButton" class="action-button" type="button" aria-label="Interact">E</button>
-            <button id="sprintButton" class="action-button" type="button" aria-label="Sprint">⚡</button>
-          </div>
-          <button id="jumpButton" class="action-button action-button--primary" type="button" aria-label="Jump">▲</button>
-        </div>
+        <button id="sprintButton" class="action-button action-button--primary" type="button" aria-label="Sprint">⚡</button>
       </div>
 
       <div id="toast" class="toast"></div>
