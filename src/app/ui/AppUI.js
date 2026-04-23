@@ -57,6 +57,7 @@ export class AppUI {
     this.joystick = root.querySelector('#joystick');
     this.joystickKnob = root.querySelector('#joystickKnob');
     this.sprintButton = root.querySelector('#sprintButton');
+    this.jumpButton = root.querySelector('#jumpButton');
     this.metaDescription = root.querySelector('meta[name="description"]');
     this.toastTimeout = null;
     this.heroName = '';

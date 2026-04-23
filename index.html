@@ -57,6 +57,7 @@
             <ul class="controls-list" data-only="touch">
               <li><strong>Joystick</strong> — drag to move</li>
               <li><strong>⚡ Speed</strong> — hold to sprint</li>
+              <li><strong>▲ Jump</strong> — tap to jump</li>
               <li><strong>Inspect pill</strong> — tap when it appears near a monument</li>
               <li><strong>Screen swipe</strong> — orbit camera</li>
             </ul>
@@ -109,7 +110,8 @@
 
       <button id="inspectPrompt" class="inspect-prompt hidden" type="button" aria-live="polite" aria-label="Inspect nearby monument">
         <span class="inspect-prompt__icon">✦</span>
-        <span class="inspect-prompt__label">Tap to inspect</span>
+        <span class="inspect-prompt__label" data-only="keyboard">Enter to interact</span>
+        <span class="inspect-prompt__label" data-only="touch">Tap to inspect</span>
       </button>
 
       <div id="mobileControls" class="mobile-controls" aria-hidden="true">
@@ -117,7 +119,10 @@
           <div class="joystick-base"></div>
           <div id="joystickKnob" class="joystick-knob"></div>
         </div>
-        <button id="sprintButton" class="action-button action-button--primary" type="button" aria-label="Sprint">⚡</button>
+        <div class="action-buttons">
+          <button id="jumpButton" class="action-button" type="button" aria-label="Jump">▲</button>
+          <button id="sprintButton" class="action-button action-button--primary" type="button" aria-label="Speed">⚡</button>
+        </div>
       </div>
 
       <div id="toast" class="toast"></div>

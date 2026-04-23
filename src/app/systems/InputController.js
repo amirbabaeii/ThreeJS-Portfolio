@@ -75,7 +75,7 @@ export class InputController {
     this.canvas.addEventListener('pointercancel', this.stopDragging);
   }
 
-  attachMobileControls({ joystick, knob, sprintButton }) {
+  attachMobileControls({ joystick, knob, sprintButton, jumpButton }) {
     if (joystick && knob) {
       this.bindJoystick(joystick, knob);
     }
@@ -83,6 +83,12 @@ export class InputController {
     this.bindHoldButton(sprintButton, {
       onPress: () => this.setTouchSprint(true),
       onRelease: () => this.setTouchSprint(false),
+    });
+
+    this.bindHoldButton(jumpButton, {
+      onPress: () => {
+        this.jumpQueued = true;
+      },
     });
   }
 

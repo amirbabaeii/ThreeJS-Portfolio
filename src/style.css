@@ -267,7 +267,19 @@ input {
 }
 
 .detail-panel {
-  margin-top: 12px;
+  display: none;
+}
+
+.hud.details-open .detail-panel {
+  display: block;
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: min(420px, calc(100vw - 36px));
+  margin: 0;
+  z-index: 6;
+  pointer-events: auto;
+  animation: sheet-rise 0.22s ease-out;
 }
 
 .detail-topline {
@@ -431,6 +443,7 @@ input {
   font-size: 1.1rem;
   font-weight: 800;
   cursor: pointer;
+  pointer-events: auto;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
@@ -528,7 +541,7 @@ body.is-touch .hud {
 }
 
 .detail-close {
-  display: none;
+  display: inline-flex;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -603,28 +616,16 @@ body.is-touch .footer-hud .music-button {
   font-size: 0.8rem;
 }
 
-body.is-touch .detail-panel {
-  display: none;
-}
-
 body.is-touch .hud.details-open .detail-panel {
-  display: block;
-  position: fixed;
-  left: 12px;
+  top: auto;
   right: 12px;
+  left: 12px;
   bottom: 220px;
   width: auto;
   max-height: 48vh;
   overflow-y: auto;
-  margin-top: 0;
   z-index: 9;
-  pointer-events: auto;
   -webkit-overflow-scrolling: touch;
-  animation: sheet-rise 0.22s ease-out;
-}
-
-body.is-touch .detail-close {
-  display: inline-flex;
 }
 
 body.is-touch .mobile-controls {
@@ -634,7 +635,7 @@ body.is-touch .mobile-controls {
 .inspect-prompt {
   position: fixed;
   left: 50%;
-  bottom: 230px;
+  bottom: 96px;
   transform: translateX(-50%);
   z-index: 11;
   display: inline-flex;
@@ -654,6 +655,22 @@ body.is-touch .mobile-controls {
   -webkit-tap-highlight-color: transparent;
   animation: prompt-pulse 1.2s ease-in-out infinite;
   font-family: inherit;
+}
+
+.inspect-prompt__label[data-only="touch"] {
+  display: none;
+}
+
+body.is-touch .inspect-prompt {
+  bottom: 230px;
+}
+
+body.is-touch .inspect-prompt__label[data-only="keyboard"] {
+  display: none;
+}
+
+body.is-touch .inspect-prompt__label[data-only="touch"] {
+  display: inline;
 }
 
 .inspect-prompt:active {
@@ -702,11 +719,7 @@ body.is-touch .mobile-controls {
   }
 }
 
-body:not(.is-touch) .inspect-prompt {
-  display: none !important;
-}
-
-body.is-touch .hud.details-open ~ .inspect-prompt {
+.hud.details-open ~ .inspect-prompt {
   display: none;
 }
 

@@ -83,6 +83,7 @@ export class CareerOdysseyApp {
         joystick: this.ui.joystick,
         knob: this.ui.joystickKnob,
         sprintButton: this.ui.sprintButton,
+        jumpButton: this.ui.jumpButton,
       },
     });
 
