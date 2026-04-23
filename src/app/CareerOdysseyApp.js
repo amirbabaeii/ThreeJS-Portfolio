@@ -115,6 +115,21 @@ export class CareerOdysseyApp {
     });
     this.ui.setMusicEnabled(this.music.enabled);
 
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'Enter' || event.repeat) return;
+
+      if (this.ui.startScreen.classList.contains('visible')) {
+        event.preventDefault();
+        void this.startJourney();
+        return;
+      }
+
+      if (this.ui.finishScreen.classList.contains('visible')) {
+        event.preventDefault();
+        void this.restartJourney();
+      }
+    });
+
     window.addEventListener('resize', this.handleResize);
     window.addEventListener(
       'pointerdown',
