@@ -156,9 +156,19 @@ input {
 .button-row {
   display: flex;
   gap: 16px;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
   margin-top: 24px;
+}
+
+.button-row .primary-button {
+  margin-right: auto;
+  align-self: flex-end;
+}
+
+.button-row .controls-list {
+  margin-left: auto;
+  align-self: flex-start;
 }
 
 .primary-button {
