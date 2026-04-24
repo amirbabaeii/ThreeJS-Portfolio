@@ -111,7 +111,11 @@ export class CareerOdysseyApp {
       this.ui.closeDetails();
     });
     this.ui.bindInspectPrompt(() => {
-      this.input.queueInteract();
+      // Run the interaction synchronously inside the user gesture.
+      // Routing through queueInteract() defers window.open() to the next
+      // animation frame, which mobile browsers treat as a non-user-gesture
+      // popup and block (LinkedIn / GitHub never open).
+      this.triggerInteract();
     });
     this.ui.setMusicEnabled(this.music.enabled);
 
@@ -309,6 +313,42 @@ export class CareerOdysseyApp {
     this.ui.showToast('Journey complete');
   }
 
+  openExternalLink(url) {
+    // Use a synthesized anchor click rather than window.open(). Mobile
+    // browsers (especially iOS Safari) treat synchronous anchor clicks as
+    // user-initiated navigation and let them through, while window.open()
+    // calls — even inside a click handler — are frequently blocked.
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+
+  triggerInteract() {
+    if (!this.state.started || this.state.completed) {
+      return;
+    }
+
+    // Clear any pending queued interact so the animation loop does not
+    // re-fire the same interaction next frame.
+    this.input.consumeInteract();
+
+    this.updateNearestTarget();
+    this.targetCheckAccumulator = 0;
+
+    if (this.state.nearest) {
+      this.interactWithNearest();
+      this.ui.openDetails();
+      this.state.inspectedTarget = this.state.nearest;
+    } else {
+      this.ui.showToast('Walk closer to a monument to inspect');
+    }
+  }
+
   interactWithNearest() {
     const target = this.state.nearest;
 
@@ -344,7 +384,7 @@ export class CareerOdysseyApp {
       const { link } = target.userData;
       this.ui.setLinkDetails(link);
       this.music.playLink();
-      window.open(link.url, '_blank', 'noopener,noreferrer');
+      this.openExternalLink(link.url);
       this.ui.showToast(`Opening ${link.label}`);
       return;
     }
