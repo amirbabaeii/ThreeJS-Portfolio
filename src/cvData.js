@@ -4,6 +4,11 @@ export const heroProfile = {
   tagline: 'Backend engineer crafting scalable Laravel systems, APIs, automation, and resilient services.',
   intro:
     'Career Odyssey turns Amir\'s resume into a polished playable world where each monument represents a real chapter of his experience or education.',
+  contact: {
+    email: 'amirbabaei.dev@gmail.com',
+    phone: '+90 534 336 2185',
+    location: 'Istanbul, Turkey',
+  },
   links: [
     {
       id: 'linkedin',

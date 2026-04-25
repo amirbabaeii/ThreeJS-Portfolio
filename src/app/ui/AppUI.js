@@ -38,6 +38,9 @@ export class AppUI {
     this.finishScreen = getRequiredElement(root, '#finishScreen');
     this.finishCopy = getRequiredElement(root, '#finishCopy');
     this.restartButton = getRequiredElement(root, '#restartButton');
+    this.contactEmail = root.querySelector('#contactEmail');
+    this.contactPhone = root.querySelector('#contactPhone');
+    this.contactLocation = root.querySelector('#contactLocation');
     this.hud = getRequiredElement(root, '#hud');
     this.heroTitle = getRequiredElement(root, '#heroTitle');
     this.heroSubtitle = getRequiredElement(root, '#heroSubtitle');
@@ -78,6 +81,28 @@ export class AppUI {
     this.startCopy.textContent = heroProfile.intro;
     this.heroTitle.textContent = heroProfile.name;
     this.heroSubtitle.textContent = heroProfile.tagline;
+
+    this.hydrateContact(heroProfile.contact);
+  }
+
+  hydrateContact(contact) {
+    if (!contact) return;
+
+    if (this.contactEmail && contact.email) {
+      this.contactEmail.href = `mailto:${contact.email}`;
+      this.contactEmail.textContent = contact.email;
+    }
+
+    if (this.contactPhone && contact.phone) {
+      // tel: URLs need digits only (plus a leading "+"), no spaces.
+      const telDigits = contact.phone.replace(/[^\d+]/g, '');
+      this.contactPhone.href = `tel:${telDigits}`;
+      this.contactPhone.textContent = contact.phone;
+    }
+
+    if (this.contactLocation && contact.location) {
+      this.contactLocation.textContent = contact.location;
+    }
   }
 
   bindPlay(handler) {

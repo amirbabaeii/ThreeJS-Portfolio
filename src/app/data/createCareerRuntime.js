@@ -4,6 +4,7 @@ export function createCareerRuntime() {
   return {
     heroProfile: {
       ...sourceHeroProfile,
+      contact: { ...sourceHeroProfile.contact },
       links: sourceHeroProfile.links.map((link) => ({ ...link })),
     },
     milestones: sourceMilestones.map((item, index) => ({
