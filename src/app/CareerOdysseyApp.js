@@ -255,7 +255,7 @@ export class CareerOdysseyApp {
   }
 
   getFinishCopy() {
-    return `${this.heroProfile.name}'s career route is fully unlocked. This world turns experience, education, and profile links into a memorable review instead of a flat PDF.`;
+    return 'Thanks for walking through my career. If anything caught your eye, the contact details below are the best way to reach me.';
   }
 
   updateNearestTarget() {
@@ -317,7 +317,7 @@ export class CareerOdysseyApp {
     // Use a synthesized anchor click rather than window.open(). Mobile
     // browsers (especially iOS Safari) treat synchronous anchor clicks as
     // user-initiated navigation and let them through, while window.open()
-    // calls — even inside a click handler — are frequently blocked.
+    // calls (even inside a click handler) are frequently blocked.
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.target = '_blank';

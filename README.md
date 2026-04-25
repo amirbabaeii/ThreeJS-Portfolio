@@ -1,4 +1,4 @@
-# Amir Babaei — Career Odyssey
+# Amir Babaei: Career Odyssey
 
 A Three.js mini-game that turns my CV into an interactive career review.
 
@@ -15,11 +15,11 @@ A Three.js mini-game that turns my CV into an interactive career review.
 
 ## Controls
 
-- `WASD` or `Arrow Keys` — Move
-- `Shift` — Sprint
-- `Space` — Jump
-- `Mouse Drag` — Orbit camera
-- `Enter` — Interact / Open links / Finish the game
+- `WASD` or `Arrow Keys`: Move
+- `Shift`: Sprint
+- `Space`: Jump
+- `Mouse Drag`: Orbit camera
+- `Enter`: Interact / Open links / Finish the game
 
 ## Run locally
 

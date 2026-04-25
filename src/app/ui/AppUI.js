@@ -63,17 +63,15 @@ export class AppUI {
     this.jumpButton = root.querySelector('#jumpButton');
     this.metaDescription = root.querySelector('meta[name="description"]');
     this.toastTimeout = null;
-    this.heroName = '';
   }
 
   hydrate(heroProfile) {
-    this.heroName = heroProfile.name;
     document.title = `${heroProfile.name} | Career Odyssey`;
 
     if (this.metaDescription) {
       this.metaDescription.setAttribute(
         'content',
-        `Interactive Three.js portfolio for ${heroProfile.name}. ${heroProfile.tagline}`,
+        `${heroProfile.name}. ${heroProfile.tagline} An interactive Three.js portfolio.`,
       );
     }
 
@@ -203,11 +201,11 @@ export class AppUI {
     this.setDetailPanel({
       eyebrow: 'Spawn Point',
       title: 'Launch Platform',
-      meta: `A cinematic review of ${this.heroName}'s career. Move forward to begin.`,
+      meta: 'Move forward to start walking through my career.',
       bullets: [
         'Inspect monuments to unlock chapters.',
         'Use Enter on the profile terminals to open LinkedIn or GitHub.',
-        'Complete the journey and enter the final gateway.',
+        'Reach the final gateway to finish.',
       ],
     });
   }

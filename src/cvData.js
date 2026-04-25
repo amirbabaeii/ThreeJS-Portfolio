@@ -1,9 +1,9 @@
-export const heroProfile = {
+﻿export const heroProfile = {
   name: 'Amir Babaei',
   role: 'Senior Backend Developer',
   tagline: 'Backend engineer crafting scalable Laravel systems, APIs, automation, and resilient services.',
   intro:
-    'Career Odyssey turns Amir\'s resume into a polished playable world where each monument represents a real chapter of his experience or education.',
+    'I built Career Odyssey to turn my resume into a playable world. Every monument is a real chapter from my experience or education.',
   contact: {
     email: 'amirbabaei.dev@gmail.com',
     phone: '+90 534 336 2185',
@@ -32,8 +32,8 @@ export const milestones = [
     id: 'arpm',
     category: 'experience',
     title: 'Senior Backend Developer',
-    place: 'ARPM.co — New York, USA',
-    period: 'Dec 2024 — Present',
+    place: 'ARPM.co, New York, USA',
+    period: 'Dec 2024 - Present',
     accent: '#7dd3fc',
     vibe: 'Distributed systems and delivery',
     bullets: [
@@ -47,8 +47,8 @@ export const milestones = [
     id: 'ecomelk',
     category: 'experience',
     title: 'Senior Backend Developer',
-    place: 'Ecomelk.com — Tehran, Iran',
-    period: 'Jul 2022 — Nov 2024',
+    place: 'Ecomelk.com, Tehran, Iran',
+    period: 'Jul 2022 - Nov 2024',
     accent: '#5eead4',
     vibe: 'Optimization, leadership, secure auth',
     bullets: [
@@ -62,8 +62,8 @@ export const milestones = [
     id: 'drmobile',
     category: 'experience',
     title: 'Backend Developer',
-    place: 'Drmobile.ir — Rasht, Iran',
-    period: 'Dec 2021 — May 2022',
+    place: 'Drmobile.ir, Rasht, Iran',
+    period: 'Dec 2021 - May 2022',
     accent: '#93c5fd',
     vibe: 'Clean architecture and testing',
     bullets: [
@@ -76,8 +76,8 @@ export const milestones = [
     id: 'arvan',
     category: 'experience',
     title: 'Backend Developer',
-    place: 'Arvan Real Estate — Rasht, Iran',
-    period: 'Aug 2021 — Dec 2021',
+    place: 'Arvan Real Estate, Rasht, Iran',
+    period: 'Aug 2021 - Dec 2021',
     accent: '#c4b5fd',
     vibe: 'APIs, caching, and speed',
     bullets: [
@@ -89,8 +89,8 @@ export const milestones = [
     id: 'farmehr',
     category: 'experience',
     title: 'Full Stack Developer',
-    place: 'Farmehr Rayaneh Co. — Rasht, Iran',
-    period: 'Jul 2019 — Aug 2021',
+    place: 'Farmehr Rayaneh Co., Rasht, Iran',
+    period: 'Jul 2019 - Aug 2021',
     accent: '#f9a8d4',
     vibe: 'Product building and delivery',
     bullets: [
@@ -104,7 +104,7 @@ export const milestones = [
     category: 'experience',
     title: 'Full Stack Web Developer',
     place: 'Freelancer',
-    period: 'Jul 2019 — Jul 2022',
+    period: 'Jul 2019 - Jul 2022',
     accent: '#fdba74',
     vibe: 'Independent execution and ecosystem breadth',
     bullets: [
@@ -116,8 +116,8 @@ export const milestones = [
     id: 'university',
     category: 'education',
     title: 'Bachelor of Computer Engineering',
-    place: 'University of Guilan — Rasht, Iran',
-    period: 'Oct 2019 — Mar 2024',
+    place: 'University of Guilan, Rasht, Iran',
+    period: 'Oct 2019 - Mar 2024',
     accent: '#fde047',
     vibe: 'Algorithms and engineering foundations',
     bullets: [
@@ -129,8 +129,8 @@ export const milestones = [
     id: 'highschool',
     category: 'education',
     title: 'Diploma of Maths and Physics',
-    place: 'Beheshti High School — Rasht, Iran',
-    period: 'Oct 2015 — Jun 2019',
+    place: 'Beheshti High School, Rasht, Iran',
+    period: 'Oct 2015 - Jun 2019',
     accent: '#fca5a5',
     vibe: 'Analytical roots',
     bullets: ['Built a strong base in mathematics and physics.'],
