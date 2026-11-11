@@ -56,6 +56,9 @@ export class AppUI {
     this.hintChip = getRequiredElement(root, '#hintChip');
     this.toast = getRequiredElement(root, '#toast');
     this.musicToggle = getRequiredElement(root, '#musicToggle');
+    this.qualityToggle = root.querySelector('#qualityToggle');
+    this.objectiveDistance = root.querySelector('#objectiveDistance');
+    this.lastDistance = null;
     this.mobileControls = root.querySelector('#mobileControls');
     this.joystick = root.querySelector('#joystick');
     this.joystickKnob = root.querySelector('#joystickKnob');
@@ -113,6 +116,32 @@ export class AppUI {
 
   bindMusicToggle(handler) {
     this.musicToggle.addEventListener('click', handler);
+  }
+
+  bindQualityToggle(handler) {
+    this.qualityToggle?.addEventListener('click', handler);
+  }
+
+  setQualityLabel(label) {
+    if (!this.qualityToggle) {
+      return;
+    }
+
+    // Touch layouts stack the chips in a narrow column, so keep it short.
+    const compact = document.body.classList.contains('is-touch');
+    this.qualityToggle.textContent = compact ? `⚙ ${label.replace('Auto · ', 'Auto ')}` : `Graphics: ${label}`;
+    this.qualityToggle.setAttribute('aria-label', `Graphics quality: ${label}. Click to change.`);
+  }
+
+  /** Only touches the DOM when the rounded distance actually changes. */
+  updateObjectiveDistance(distance) {
+    if (!this.objectiveDistance || distance === this.lastDistance) {
+      return;
+    }
+
+    this.lastDistance = distance;
+    this.objectiveDistance.textContent = distance === null ? '' : `${distance} m`;
+    this.objectiveDistance.classList.toggle('hidden', distance === null);
   }
 
   bindDetailsClose(handler) {

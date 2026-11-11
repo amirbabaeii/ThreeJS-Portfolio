@@ -5,9 +5,10 @@ function clampAxis(value) {
 }
 
 export class InputController {
-  constructor({ canvas, onOrbit, onToggleMusic, mobile } = {}) {
+  constructor({ canvas, onOrbit, onZoom, onToggleMusic, mobile } = {}) {
     this.canvas = canvas;
     this.onOrbit = onOrbit;
+    this.onZoom = onZoom;
     this.onToggleMusic = onToggleMusic;
     this.forward = 0;
     this.strafe = 0;
@@ -58,6 +59,12 @@ export class InputController {
       if (event && event.pointerId !== this.orbitPointerId) return;
       this.orbitPointerId = null;
     };
+    this.handleWheel = (event) => {
+      event.preventDefault();
+      // Normalise line/page deltas (Firefox) to pixels.
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+      this.onZoom?.(event.deltaY * scale);
+    };
 
     this.attachEvents();
 
@@ -73,6 +80,7 @@ export class InputController {
     this.canvas.addEventListener('pointermove', this.handlePointerMove);
     this.canvas.addEventListener('pointerup', this.stopDragging);
     this.canvas.addEventListener('pointercancel', this.stopDragging);
+    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
   }
 
   attachMobileControls({ joystick, knob, sprintButton, jumpButton }) {

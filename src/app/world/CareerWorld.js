@@ -1,14 +1,32 @@
 import * as THREE from 'three';
+
 import { WORLD_LAYOUT } from '../config.js';
+import { damp, dampFactor, smoothstep } from '../utils/math.js';
+import { DustEffect, UnlockEffect, createMotes } from './effects.js';
+import { createGrassField } from './grass.js';
+import { Monument, createGroundGlowMaterial } from './monuments.js';
+import { FinishPortal } from './portal.js';
+import {
+  createCrystalField,
+  createFloatingIslands,
+  createLampPosts,
+  createRockField,
+  createSkyline,
+  mergeParts,
+  placed,
+} from './props.js';
+import { createHologramMaterial, sharedUniforms } from './shaderLib.js';
 import { make3DIconBadge, makeLabelSprite } from './signage.js';
+import { bakeSkyBackground, createEnvironmentMap, createStarField } from './sky.js';
+import { TRACK, createGround, createRoad, getTerrainHeight } from './terrain.js';
 
-function createMonumentGeometry(category) {
-  if (category === 'education') {
-    return new THREE.CylinderGeometry(0.16, 0.46, 2.7, 5);
-  }
-
-  return new THREE.CapsuleGeometry(0.42, 1.5, 6, 10);
-}
+const LIGHT_POOL_SIZE = 3;
+const POOL_INTENSITY = 32;
+const MOON_OFFSET = new THREE.Vector3(-12, 30, -8);
+const SHADOW_EXTENT = 20;
+// Road position treated as "progress" before any chapter is unlocked: far
+// enough behind the start that no part of the visible road reads as unlocked.
+const NO_PROGRESS_Z = TRACK.startZ - 20;
 
 export class CareerWorld {
   constructor({ scene, heroProfile, milestones }) {
@@ -17,461 +35,289 @@ export class CareerWorld {
     this.milestones = milestones;
     this.interactives = [];
     this.monuments = [];
-    this.contactStations = [];
     this.monumentById = new Map();
-    this.beacon = null;
+    this.contactStations = [];
+    this.colliders = [];
+    this.platforms = [];
+    this.lightEmitters = [];
+    this.lightPool = [];
     this.finishPortal = null;
-    this.finishGlow = null;
-    this.particles = null;
+    this.beacon = null;
+    this.grass = null;
+    this.motes = null;
+    this.islands = null;
+    this.tier = null;
+    this.completed = false;
+    this.progressTarget = NO_PROGRESS_Z;
     this.tmpVec = new THREE.Vector3();
     this.beaconTarget = new THREE.Vector3();
+    this.portalZ =
+      WORLD_LAYOUT.firstMonumentZ +
+      milestones.length * WORLD_LAYOUT.monumentSpacing +
+      WORLD_LAYOUT.finishPortalOffset;
+    this.blockers = this.computeBlockers();
   }
 
-  createSky() {
-    const skyGeo = new THREE.SphereGeometry(180, 32, 32);
-    const skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      uniforms: {
-        topColor: { value: new THREE.Color(0x16385c) },
-        horizonColor: { value: new THREE.Color(0x091c31) },
-        bottomColor: { value: new THREE.Color(0x02050b) },
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 horizonColor;
-        uniform vec3 bottomColor;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition).y;
-          float mid = smoothstep(-0.22, 0.25, h);
-          vec3 color = mix(bottomColor, horizonColor, mid);
-          color = mix(color, topColor, smoothstep(0.0, 0.9, h));
-          gl_FragColor = vec4(color, 1.0);
-        }
-      `,
+  monumentPosition(index) {
+    const side = index % 2 === 0 ? -1 : 1;
+    return {
+      x: side * WORLD_LAYOUT.monumentOffsetX,
+      z: WORLD_LAYOUT.firstMonumentZ + index * WORLD_LAYOUT.monumentSpacing,
+    };
+  }
+
+  /** Areas that scatter passes (grass, crystals, lamps) must keep clear. */
+  computeBlockers() {
+    const blockers = [{ x: 0, z: 0, r: 2.5 }];
+
+    this.milestones.forEach((_, index) => {
+      const { x, z } = this.monumentPosition(index);
+      blockers.push({ x, z, r: 3.9 });
+      blockers.push({ x: 7.3, z: z - 6, r: 0.9 }, { x: -7.3, z: z - 6, r: 0.9 });
     });
 
-    this.scene.add(new THREE.Mesh(skyGeo, skyMat));
-
-    const starCount = 1500;
-    const positions = new Float32Array(starCount * 3);
-
-    for (let index = 0; index < starCount; index += 1) {
-      positions[index * 3] = (Math.random() - 0.5) * 250;
-      positions[index * 3 + 1] = 12 + Math.random() * 90;
-      positions[index * 3 + 2] = (Math.random() - 0.5) * 250;
+    for (const side of [-1, 1]) {
+      blockers.push({ x: side * WORLD_LAYOUT.contactStationX, z: WORLD_LAYOUT.contactStationZ, r: 2.1 });
     }
 
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const starMat = new THREE.PointsMaterial({
-      color: 0xe3f4ff,
-      size: 0.34,
-      opacity: 0.9,
-      transparent: true,
-      depthWrite: false,
-    });
-    this.scene.add(new THREE.Points(starGeo, starMat));
+    blockers.push({ x: 0, z: this.portalZ, r: 6.8 });
+    return blockers;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Construction (called in stages by the loading screen)
+  // ---------------------------------------------------------------------------
+
+  createSky(renderer, tier) {
+    this.skyTarget = bakeSkyBackground(renderer, tier?.id === 'high' ? 1024 : 512);
+    this.scene.background = this.skyTarget.texture;
+    this.envTarget = createEnvironmentMap(renderer);
+    this.scene.environment = this.envTarget.texture;
+    this.scene.environmentIntensity = 0.85;
+    this.stars = createStarField();
+    this.scene.add(this.stars);
   }
 
   createLights() {
-    const hemisphere = new THREE.HemisphereLight(0x8ccfff, 0x071016, 1.15);
-    this.scene.add(hemisphere);
+    this.hemisphere = new THREE.HemisphereLight(0x6d8fd0, 0x0a0e18, 0.5);
+    this.scene.add(this.hemisphere);
 
-    const directional = new THREE.DirectionalLight(0xbfe3ff, 1.6);
-    directional.position.set(8, 20, 10);
-    directional.castShadow = true;
-    directional.shadow.mapSize.set(1024, 1024);
-    directional.shadow.camera.left = -34;
-    directional.shadow.camera.right = 34;
-    directional.shadow.camera.top = 34;
-    directional.shadow.camera.bottom = -34;
-    directional.shadow.camera.near = 0.1;
-    directional.shadow.camera.far = 70;
-    this.scene.add(directional);
+    this.moon = new THREE.DirectionalLight(0xc4d4ff, 1.75);
+    this.moon.position.copy(MOON_OFFSET);
+    this.moon.castShadow = true;
+    const shadow = this.moon.shadow;
+    shadow.mapSize.set(2048, 2048);
+    shadow.camera.left = -SHADOW_EXTENT;
+    shadow.camera.right = SHADOW_EXTENT;
+    shadow.camera.top = SHADOW_EXTENT;
+    shadow.camera.bottom = -SHADOW_EXTENT;
+    shadow.camera.near = 1;
+    shadow.camera.far = 90;
+    shadow.bias = -0.0004;
+    shadow.normalBias = 0.03;
+    this.scene.add(this.moon, this.moon.target);
 
-    const rim = new THREE.PointLight(0x7dd3fc, 12, 80, 2);
-    rim.position.set(0, 6, 26);
-    this.scene.add(rim);
+    // A fixed-size pool of point lights is re-assigned every frame to the
+    // glowing landmarks nearest to the player. A constant light count keeps
+    // shader programs stable, and 3 lights cost far less than one per prop.
+    for (let index = 0; index < LIGHT_POOL_SIZE; index += 1) {
+      const light = new THREE.PointLight(0xffffff, 0, 22, 2);
+      this.lightPool.push(light);
+      this.scene.add(light);
+    }
   }
 
-  createFloor() {
-    const floorGeo = new THREE.CircleGeometry(90, 64);
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x07111a,
-      metalness: 0.45,
-      roughness: 0.74,
-      emissive: 0x07111a,
-      emissiveIntensity: 0.25,
-    });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+  createTerrain() {
+    this.ground = createGround();
+    this.road = createRoad();
+    this.scene.add(this.ground, this.road);
+  }
 
-    const grid = new THREE.GridHelper(160, 80, 0x17334f, 0x0f1d2f);
-    grid.position.y = 0.02;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.34;
-    this.scene.add(grid);
+  createVegetation() {
+    this.grass = createGrassField({ blockers: this.blockers });
+    this.scene.add(this.grass);
+  }
 
-    const roadGeo = new THREE.PlaneGeometry(12, 220, 1, 60);
-    const positions = roadGeo.attributes.position;
-
-    for (let index = 0; index < positions.count; index += 1) {
-      const x = positions.getX(index);
-      const y = Math.sin(positions.getY(index) * 0.08) * 0.08 + Math.cos(x * 0.8) * 0.04;
-      positions.setZ(index, y);
-    }
-
-    roadGeo.computeVertexNormals();
-
-    const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x0c1727,
-      metalness: 0.35,
-      roughness: 0.28,
-      emissive: 0x10263c,
-      emissiveIntensity: 0.28,
-    });
-    const road = new THREE.Mesh(roadGeo, roadMat);
-    road.rotation.x = -Math.PI / 2;
-    road.position.z = 100;
-    road.receiveShadow = true;
-    this.scene.add(road);
-
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0x79cfff, transparent: true, opacity: 0.85 });
-
-    for (let index = 0; index < 2; index += 1) {
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 200), lineMat);
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(index === 0 ? -3.15 : 3.15, 0.04, 100);
-      this.scene.add(line);
-    }
-
-    const crystalGeo = new THREE.OctahedronGeometry(0.33, 0);
-    const crystalMat = new THREE.MeshStandardMaterial({
-      color: 0x5eead4,
-      emissive: 0x4dd3be,
-      emissiveIntensity: 0.9,
-      roughness: 0.25,
-      metalness: 0.2,
-    });
-    const crystalGroup = new THREE.Group();
-
-    for (let index = 0; index < 40; index += 1) {
-      const mesh = new THREE.Mesh(crystalGeo, crystalMat);
-      const side = index % 2 === 0 ? -1 : 1;
-      mesh.position.set(
-        side * (10 + Math.random() * 14),
-        0.65 + Math.random() * 2.8,
-        8 + index * 5.2 + Math.random() * 3,
-      );
-      mesh.scale.setScalar(0.7 + Math.random() * 2.6);
-      mesh.rotation.set(Math.random(), Math.random() * Math.PI, 0);
-      crystalGroup.add(mesh);
-    }
-
-    this.scene.add(crystalGroup);
+  createProps() {
+    this.crystals = createCrystalField({ blockers: this.blockers });
+    this.rocks = createRockField({ blockers: this.blockers });
+    this.lamps = createLampPosts({ blockers: this.blockers, colliders: this.colliders });
+    this.skyline = createSkyline({});
+    this.islands = createFloatingIslands({});
+    this.scene.add(this.crystals, this.rocks, this.lamps, this.skyline, this.islands);
   }
 
   createParticleField() {
-    const count = 700;
-    const minY = 0.6;
-    const maxY = 12;
-    const positions = new Float32Array(count * 3);
-    const speeds = new Float32Array(count);
-
-    for (let index = 0; index < count; index += 1) {
-      positions[index * 3] = (Math.random() - 0.5) * 56;
-      positions[index * 3 + 1] = minY + Math.random() * (maxY - minY);
-      positions[index * 3 + 2] = Math.random() * 212;
-      speeds[index] = 0.2 + Math.random() * 0.7;
-    }
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('speed', new THREE.BufferAttribute(speeds, 1));
-
-    const material = new THREE.PointsMaterial({
-      color: 0x8ce2ff,
-      size: 0.12,
-      transparent: true,
-      opacity: 0.85,
-      depthWrite: false,
-    });
-
-    // Move the per-frame rise animation to the GPU so the CPU no longer
-    // rewrites 700 vertices + re-uploads the buffer every frame.
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = { value: 0 };
-      shader.uniforms.uMinY = { value: minY };
-      shader.uniforms.uRange = { value: maxY - minY };
-      shader.vertexShader = `
-        uniform float uTime;
-        uniform float uMinY;
-        uniform float uRange;
-        attribute float speed;
-        ${shader.vertexShader}
-      `.replace(
-        '#include <begin_vertex>',
-        `
-          vec3 transformed = position;
-          float relY = transformed.y - uMinY;
-          transformed.y = uMinY + mod(relY + speed * uTime, uRange);
-        `,
-      );
-      material.userData.shader = shader;
-    };
-
-    this.particles = new THREE.Points(geometry, material);
-    this.scene.add(this.particles);
+    this.motes = createMotes({});
+    this.scene.add(this.motes);
+    this.unlockEffect = new UnlockEffect(this.scene);
+    this.dust = new DustEffect(this.scene);
   }
 
   createMonuments() {
     this.milestones.forEach((item, index) => {
-      const group = new THREE.Group();
-      const side = index % 2 === 0 ? -1 : 1;
-      const x = side * 7.7;
-      const z = WORLD_LAYOUT.firstMonumentZ + index * WORLD_LAYOUT.monumentSpacing;
-      group.position.set(x, 0, z);
-
-      const accent = new THREE.Color(item.accent);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x132538, metalness: 0.45, roughness: 0.46 });
-      const accentMat = new THREE.MeshStandardMaterial({
-        color: accent,
-        emissive: accent,
-        emissiveIntensity: 0.6,
-        roughness: 0.18,
-        metalness: 0.22,
+      const { x, z } = this.monumentPosition(index);
+      const monument = new Monument(item, { x, z, total: this.milestones.length });
+      this.scene.add(monument.group, monument.arch);
+      this.monuments.push(monument);
+      this.monumentById.set(item.id, monument);
+      this.interactives.push(monument.group);
+      this.colliders.push(...monument.colliders);
+      this.lightEmitters.push({
+        anchor: monument.lightAnchor,
+        color: new THREE.Color(item.accent),
+        strength: () => monument.getLightStrength(),
+        d2: 0,
       });
-      const statueMat = new THREE.MeshStandardMaterial({
-        color: 0xebf7ff,
-        emissive: accent,
-        emissiveIntensity: 0.15,
-        roughness: 0.2,
-        metalness: 0.08,
-      });
-
-      const dais = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.65, 1.05, 24), baseMat);
-      dais.position.y = 0.52;
-      dais.castShadow = true;
-      dais.receiveShadow = true;
-      group.add(dais);
-
-      const trim = new THREE.Mesh(new THREE.TorusGeometry(1.58, 0.09, 12, 42), accentMat);
-      trim.rotation.x = Math.PI / 2;
-      trim.position.y = 1.06;
-      trim.castShadow = true;
-      group.add(trim);
-
-      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 1.1, 1.85, 6), baseMat);
-      pillar.position.y = 1.5;
-      pillar.castShadow = true;
-      group.add(pillar);
-
-      const statue = new THREE.Mesh(createMonumentGeometry(item.category), statueMat);
-      statue.position.y = item.category === 'education' ? 3.55 : 3.35;
-      statue.castShadow = true;
-      group.add(statue);
-
-      if (item.category === 'experience') {
-        const crest = new THREE.Mesh(new THREE.TorusKnotGeometry(0.3, 0.09, 64, 8), accentMat);
-        crest.position.set(0, 4.78, 0);
-        crest.scale.setScalar(0.8);
-        crest.castShadow = true;
-        group.add(crest);
-      } else {
-        const crown = new THREE.Mesh(new THREE.OctahedronGeometry(0.44, 0), accentMat);
-        crown.position.set(0, 5.1, 0);
-        crown.castShadow = true;
-        group.add(crown);
-      }
-
-      const beam = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.46, 0.85, 12, 24, 1, true),
-        new THREE.MeshBasicMaterial({
-          color: accent,
-          transparent: true,
-          opacity: 0.16,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      );
-      beam.position.y = 6.2;
-      group.add(beam);
-
-      const beacon = new THREE.PointLight(accent, 14, 18, 2);
-      beacon.position.set(0, 5.8, 0);
-      group.add(beacon);
-
-      const label = makeLabelSprite(item.title, `${item.place} · ${item.period}`, item.accent);
-      label.position.set(0, 7.8, 0);
-      group.add(label);
-
-      group.userData = {
-        type: 'milestone',
-        item,
-        interactionRadius: 4.2,
-        beam,
-        beacon,
-        label,
-        statue,
-        homeY: statue.position.y,
-      };
-
-      this.scene.add(group);
-      this.monuments.push(group);
-      this.monumentById.set(item.id, group);
-      this.interactives.push(group);
     });
+
+    const beacon = new THREE.Group();
+    const diamondGeometry = new THREE.OctahedronGeometry(0.42, 0);
+    diamondGeometry.scale(1, 1.7, 1);
+    const diamond = new THREE.Mesh(diamondGeometry, createHologramMaterial(0x9be8ff, 1.6));
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.75, 0.03, 6, 48),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7dd3fc).multiplyScalar(3) }),
+    );
+    halo.rotation.x = Math.PI / 2;
+    beacon.add(diamond, halo);
+    beacon.userData = { diamond, halo };
+    beacon.position.set(0, 12, WORLD_LAYOUT.firstMonumentZ);
+    this.beacon = beacon;
+    this.scene.add(beacon);
   }
 
   createContactStations() {
+    const plinthGeometry = mergeParts([
+      placed(new THREE.CylinderGeometry(1.25, 1.5, 0.5, 8), { position: [0, 0.25, 0], rotation: [0, Math.PI / 8, 0] }),
+      placed(new THREE.CylinderGeometry(0.9, 1.1, 0.5, 8), { position: [0, 0.75, 0], rotation: [0, Math.PI / 8, 0] }),
+    ]);
+    const trimGeometry = mergeParts([
+      placed(new THREE.TorusGeometry(1.29, 0.04, 6, 64), { position: [0, 0.52, 0], rotation: [Math.PI / 2, 0, 0] }),
+      placed(new THREE.TorusGeometry(0.93, 0.035, 6, 64), { position: [0, 1.02, 0], rotation: [Math.PI / 2, 0, 0] }),
+    ]);
+    const glowGeometry = new THREE.CircleGeometry(2.6, 40);
+    glowGeometry.rotateX(-Math.PI / 2);
+    const plinthMaterial = new THREE.MeshStandardMaterial({ color: 0x182133, metalness: 0.78, roughness: 0.3 });
+
     this.heroProfile.links.forEach((link, index) => {
       const group = new THREE.Group();
-      const x = index === 0 ? -5.2 : 5.2;
-      group.position.set(x, 0, WORLD_LAYOUT.contactStationZ);
-
+      const side = index === 0 ? -1 : 1;
+      group.position.set(side * WORLD_LAYOUT.contactStationX, 0, WORLD_LAYOUT.contactStationZ);
       const accent = new THREE.Color(link.accent);
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: 0x101b2b,
-        roughness: 0.28,
-        metalness: 0.34,
-        emissive: 0x0f1c2b,
-        emissiveIntensity: 0.2,
-      });
-      const accentMat = new THREE.MeshStandardMaterial({
-        color: accent,
-        emissive: accent,
-        emissiveIntensity: 0.45,
-        roughness: 0.15,
-        metalness: 0.2,
-      });
 
-      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.45, 1.02, 8), bodyMat);
-      plinth.position.y = 0.52;
+      const plinth = new THREE.Mesh(plinthGeometry, plinthMaterial);
       plinth.castShadow = true;
+      plinth.receiveShadow = true;
       group.add(plinth);
 
-      const trim = new THREE.Mesh(new THREE.TorusGeometry(0.96, 0.08, 16, 48), accentMat);
-      trim.position.y = 1.02;
-      trim.rotation.x = Math.PI / 2;
-      trim.castShadow = true;
-      group.add(trim);
+      const trimMaterial = new THREE.MeshStandardMaterial({
+        color: accent.clone().multiplyScalar(0.3),
+        emissive: accent,
+        emissiveIntensity: 1.3,
+      });
+      group.add(new THREE.Mesh(trimGeometry, trimMaterial));
 
       const badge = make3DIconBadge(link);
-      badge.position.set(0, 2.5, 0);
+      badge.position.set(0, 2.38, 0);
+      badge.rotation.y = Math.PI - side * 0.25;
       group.add(badge);
 
-      const label = makeLabelSprite(link.label, link.description, link.accent);
-      label.scale.set(4.6, 2.25, 1);
-      label.position.set(0, 4.8, 0);
+      const label = makeLabelSprite({
+        eyebrow: 'Profile terminal',
+        title: link.label,
+        subtitle: link.description,
+        accent: link.accent,
+        status: { text: '↗ Open link', filled: false },
+      });
+      label.scale.multiplyScalar(0.72);
+      label.position.set(0, 4.35, 0);
       group.add(label);
 
-      const floorGlow = new THREE.Mesh(
-        new THREE.CircleGeometry(1.35, 40),
-        new THREE.MeshBasicMaterial({
-          color: accent,
-          transparent: true,
-          opacity: 0.22,
-          depthWrite: false,
-        }),
-      );
-      floorGlow.rotation.x = -Math.PI / 2;
-      floorGlow.position.y = 0.03;
-      group.add(floorGlow);
+      const glowMaterial = createGroundGlowMaterial(accent);
+      glowMaterial.uniforms.uStrength.value = 1;
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.position.y = 0.04;
+      group.add(glow);
 
       group.userData = {
         type: 'link',
         link,
-        interactionRadius: 3.2,
-        labelSprite: label,
-        holo: badge,
-        holoBasePosition: badge.position.clone(),
-        baseRotationY: Math.PI,
-        labelBaseY: label.position.y,
-        floorGlowBaseOpacity: floorGlow.material.opacity,
-        floorGlow,
+        interactionRadius: 3.3,
+        badge,
+        label,
+        badgeBaseY: badge.position.y,
+        baseRotationY: badge.rotation.y,
+        glowMaterial,
+        trimMaterial,
       };
 
       this.scene.add(group);
       this.contactStations.push(group);
       this.interactives.push(group);
+      this.colliders.push({ x: group.position.x, z: group.position.z, r: 1.5 });
+      this.lightEmitters.push({
+        anchor: new THREE.Vector3(group.position.x, 2.4, group.position.z - 1.2),
+        color: accent,
+        strength: () => 0.55,
+        d2: 0,
+      });
     });
   }
 
   createFinishPortal() {
-    const group = new THREE.Group();
-    group.position.set(
-      0,
-      0,
-      WORLD_LAYOUT.firstMonumentZ +
-        this.milestones.length * WORLD_LAYOUT.monumentSpacing +
-        WORLD_LAYOUT.finishPortalOffset,
-    );
-
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: 0xc084fc,
-      emissive: 0xc084fc,
-      emissiveIntensity: 0.6,
-      roughness: 0.16,
-      metalness: 0.3,
+    const portal = new FinishPortal(this.portalZ);
+    this.finishPortal = portal;
+    this.scene.add(portal.group);
+    this.interactives.push(portal.group);
+    this.colliders.push(...portal.colliders);
+    this.platforms.push(portal.platform);
+    this.lightEmitters.push({
+      anchor: portal.lightAnchor,
+      color: new THREE.Color(0xc084fc),
+      strength: () => portal.getLightStrength(),
+      d2: 0,
     });
-    const outerRing = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.18, 16, 64), ringMat);
-    outerRing.position.y = 3.5;
-    outerRing.castShadow = true;
-    group.add(outerRing);
+  }
 
-    const innerPlane = new THREE.Mesh(
-      new THREE.CircleGeometry(1.86, 40),
-      new THREE.MeshBasicMaterial({
-        color: 0x91f3ff,
-        transparent: true,
-        opacity: 0.26,
-        depthWrite: false,
-      }),
-    );
-    innerPlane.position.y = 3.5;
-    group.add(innerPlane);
+  // ---------------------------------------------------------------------------
+  // Quality
+  // ---------------------------------------------------------------------------
 
-    const pad = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.4, 4.2, 1, 32),
-      new THREE.MeshStandardMaterial({
-        color: 0x111a28,
-        emissive: 0x0e1623,
-        emissiveIntensity: 0.24,
-      }),
-    );
-    pad.position.y = 0.5;
-    pad.receiveShadow = true;
-    pad.castShadow = true;
-    group.add(pad);
+  applyQuality(tier) {
+    this.tier = tier;
 
-    const glow = new THREE.PointLight(0xc084fc, 0, 18, 2);
-    glow.position.y = 3.5;
-    group.add(glow);
+    if (this.moon) {
+      this.moon.castShadow = tier.shadows;
 
-    group.visible = false;
-    group.userData = {
-      type: 'finish',
-      interactionRadius: 4.6,
-      outerRing,
-      innerPlane,
-    };
+      if (this.moon.shadow.mapSize.x !== tier.shadowMapSize) {
+        this.moon.shadow.mapSize.set(tier.shadowMapSize, tier.shadowMapSize);
+        this.moon.shadow.map?.dispose();
+        this.moon.shadow.map = null;
+      }
+    }
 
-    this.scene.add(group);
-    this.finishPortal = group;
-    this.finishGlow = glow;
-    this.interactives.push(group);
+    this.grass?.userData.setDensity(tier.grassDensity);
+    this.motes?.userData.setDensity(tier.particleDensity);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Gameplay queries
+  // ---------------------------------------------------------------------------
+
+  getGroundHeight(x, z) {
+    let height = getTerrainHeight(x, z);
+
+    for (const platform of this.platforms) {
+      const dx = x - platform.x;
+      const dz = z - platform.z;
+
+      if (dx * dx + dz * dz < platform.r * platform.r) {
+        height = Math.max(height, platform.height);
+      }
+    }
+
+    return height;
   }
 
   getUnlockedCount() {
@@ -482,11 +328,30 @@ export class CareerWorld {
     return this.milestones.find((item) => !item.unlocked) ?? null;
   }
 
+  getMilestonePosition(item) {
+    return this.monumentById.get(item.id)?.group.position ?? null;
+  }
+
+  getObjectivePosition() {
+    const next = this.getNextMilestone();
+
+    if (next) {
+      return this.getMilestonePosition(next);
+    }
+
+    return this.finishPortal?.group.position ?? null;
+  }
+
   getMaxPlayerZ() {
-    return this.finishPortal?.position.z ?? 0;
+    return this.portalZ;
+  }
+
+  isFinishActive() {
+    return Boolean(this.finishPortal?.active);
   }
 
   unlockMilestone(target) {
+    const monument = target.userData.monument;
     const milestone = target.userData.item;
 
     if (milestone.unlocked) {
@@ -494,23 +359,39 @@ export class CareerWorld {
     }
 
     milestone.unlocked = true;
+    monument.unlock();
+    this.unlockEffect.play(monument.group.position, milestone.accent);
+    this.refreshProgressTarget();
     return true;
   }
 
-  setFinishPortalActive(active) {
-    if (!this.finishPortal || !this.finishGlow) {
+  refreshProgressTarget() {
+    const unlocked = this.monuments.filter((monument) => monument.item.unlocked);
+
+    if (unlocked.length === this.monuments.length) {
+      this.progressTarget = this.portalZ + 40;
       return;
     }
 
-    this.finishPortal.visible = active;
-    this.finishGlow.intensity = active ? 22 : 0;
+    this.progressTarget = unlocked.reduce((max, monument) => Math.max(max, monument.group.position.z + 4), NO_PROGRESS_Z);
+  }
+
+  setFinishPortalActive(active) {
+    this.finishPortal?.setActive(active);
+  }
+
+  setCompleted(completed) {
+    this.completed = completed;
   }
 
   reset() {
     this.milestones.forEach((item) => {
       item.unlocked = false;
     });
+    this.monuments.forEach((monument) => monument.reset());
     this.setFinishPortalActive(false);
+    this.completed = false;
+    this.refreshProgressTarget();
   }
 
   getNearestInteractive(position) {
@@ -518,12 +399,14 @@ export class CareerWorld {
     let bestDistanceSquared = Infinity;
 
     for (const target of this.interactives) {
-      if (target.userData.type === 'finish' && !this.finishPortal?.visible) {
+      if (target.userData.type === 'finish' && !this.isFinishActive()) {
         continue;
       }
 
       const radius = target.userData.interactionRadius;
-      const distanceSquared = this.tmpVec.copy(target.position).sub(position).lengthSq();
+      const dx = target.position.x - position.x;
+      const dz = target.position.z - position.z;
+      const distanceSquared = dx * dx + dz * dz;
 
       if (distanceSquared < radius * radius && distanceSquared < bestDistanceSquared) {
         bestDistanceSquared = distanceSquared;
@@ -534,91 +417,122 @@ export class CareerWorld {
     return nearest;
   }
 
-  updateBeacon(dt, nextMilestone) {
-    if (!nextMilestone) {
-      if (this.beacon) {
-        this.beacon.visible = false;
-      }
+  emitFootstep(position, strength) {
+    this.dust?.footstep(position, strength);
+  }
+
+  emitLanding(position, intensity) {
+    this.dust?.landing(position, intensity);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-frame
+  // ---------------------------------------------------------------------------
+
+  updateShadowFollow(focus) {
+    if (!this.moon) {
       return;
     }
 
-    const target = this.monumentById.get(nextMilestone.id);
+    // Snap to shadow texels so the shadow map doesn't shimmer while moving.
+    const texel = (SHADOW_EXTENT * 2) / this.moon.shadow.mapSize.x;
+    const x = Math.round(focus.x / texel) * texel;
+    const z = Math.round(focus.z / texel) * texel;
+    this.moon.target.position.set(x, 0, z);
+    this.moon.position.set(x + MOON_OFFSET.x, MOON_OFFSET.y, z + MOON_OFFSET.z);
+  }
+
+  updateLightPool(focus) {
+    const emitters = this.lightEmitters;
+
+    for (const emitter of emitters) {
+      emitter.d2 = emitter.anchor.distanceToSquared(focus);
+    }
+
+    emitters.sort((a, b) => a.d2 - b.d2);
+
+    this.lightPool.forEach((light, index) => {
+      const emitter = emitters[index];
+
+      if (!emitter) {
+        light.intensity = 0;
+        return;
+      }
+
+      const distance = Math.sqrt(emitter.d2);
+      light.position.copy(emitter.anchor);
+      light.color.copy(emitter.color);
+      light.intensity = POOL_INTENSITY * emitter.strength() * smoothstep(42, 16, distance);
+    });
+  }
+
+  updateBeacon(dt, time, nextMilestone) {
+    if (!this.beacon) {
+      return;
+    }
+
+    let target = null;
+
+    if (nextMilestone) {
+      const position = this.getMilestonePosition(nextMilestone);
+
+      if (position) {
+        target = this.beaconTarget.set(position.x, 10.4, position.z);
+      }
+    } else if (this.isFinishActive() && !this.completed) {
+      const position = this.finishPortal.group.position;
+      target = this.beaconTarget.set(position.x, 9.6, position.z);
+    }
+
+    this.beacon.visible = Boolean(target);
 
     if (!target) {
       return;
     }
 
-    if (!this.beacon) {
-      this.beacon = new THREE.Mesh(
-        new THREE.ConeGeometry(0.7, 2.2, 16),
-        new THREE.MeshBasicMaterial({
-          color: 0x90e9ff,
-          transparent: true,
-          opacity: 0.72,
-          depthWrite: false,
-        }),
-      );
-      this.beacon.rotation.x = Math.PI;
-      this.scene.add(this.beacon);
-    }
-
-    this.beacon.visible = true;
-    this.beaconTarget.set(target.position.x, target.position.y + 8.8, target.position.z);
-    this.beacon.position.lerp(this.beaconTarget, 1 - Math.exp(-6 * dt));
-    this.beacon.position.y += Math.sin(performance.now() * 0.0035) * 0.01;
+    this.beacon.position.lerp(target, dampFactor(4, dt));
+    const { diamond, halo } = this.beacon.userData;
+    diamond.rotation.y += dt * 2.2;
+    diamond.position.y = Math.sin(time * 2.4) * 0.25;
+    halo.scale.setScalar(1 + Math.sin(time * 3.2) * 0.12);
+    halo.position.y = diamond.position.y - 0.9;
   }
 
-  updateMonuments(time) {
-    for (const group of this.monuments) {
-      const { item, beam, beacon, label, statue, homeY } = group.userData;
-      const t = time * 0.001 + item.index * 0.4;
-      beam.material.opacity = 0.12 + Math.sin(t * 1.8) * 0.03;
-      beam.scale.y = 0.95 + Math.sin(t * 1.2) * 0.04;
-      beacon.intensity = item.unlocked ? 18 : 12 + Math.sin(t * 3) * 2.4;
-      label.position.y = 7.8 + Math.sin(t * 1.8) * 0.12;
-      statue.position.y = homeY + Math.sin(t * 2.2) * 0.08;
-      statue.rotation.y += 0.003;
-    }
-
+  updateStations(time) {
     for (const station of this.contactStations) {
-      const t = time * 0.001;
-      station.userData.holo.position.y =
-        station.userData.holoBasePosition.y + Math.sin(t * 1.6 + station.position.x) * 0.06;
-      station.userData.holo.rotation.y =
-        station.userData.baseRotationY + Math.sin(t * 0.8 + station.position.x * 0.1) * 0.14;
-      station.userData.labelSprite.position.y =
-        station.userData.labelBaseY + Math.sin(t * 2 + station.position.x) * 0.1;
-      station.userData.floorGlow.material.opacity =
-        station.userData.floorGlowBaseOpacity + Math.sin(t * 3 + station.position.x) * 0.05;
-
-      if (station.userData.holo.userData?.glow) {
-        station.userData.holo.userData.glow.intensity = 9 + Math.sin(t * 4 + station.position.x) * 2;
-      }
-    }
-
-    if (this.finishPortal?.visible) {
-      const t = time * 0.001;
-      this.finishPortal.userData.outerRing.rotation.z = t * 0.9;
-      this.finishPortal.userData.innerPlane.material.opacity = 0.22 + Math.sin(t * 4) * 0.06;
-      this.finishGlow.intensity = 20 + Math.sin(t * 3) * 2;
+      const data = station.userData;
+      const phase = time + station.position.x;
+      data.badge.position.y = data.badgeBaseY + Math.sin(phase * 1.6) * 0.07;
+      data.badge.rotation.y = data.baseRotationY + Math.sin(phase * 0.8) * 0.12;
+      data.label.position.y = 4.35 + Math.sin(phase * 1.9) * 0.08;
+      data.glowMaterial.uniforms.uStrength.value = 0.9 + Math.sin(phase * 3) * 0.2;
     }
   }
 
-  updateParticles(dt) {
-    if (!this.particles) {
-      return;
+  updateAnimations({ time, dt, nextMilestone, camera, playerPosition }) {
+    sharedUniforms.uPlayerPos.value.copy(playerPosition);
+    sharedUniforms.uProgressZ.value = damp(sharedUniforms.uProgressZ.value, this.progressTarget, 1.4, dt);
+
+    const objective = this.getObjectivePosition();
+    const targetZ = objective ? objective.z : this.portalZ;
+    sharedUniforms.uTargetZ.value = damp(sharedUniforms.uTargetZ.value, targetZ, 2.5, dt);
+
+    if (this.stars) {
+      this.stars.position.copy(camera.position);
     }
 
-    const shader = this.particles.material.userData.shader;
+    this.updateShadowFollow(playerPosition);
 
-    if (shader) {
-      shader.uniforms.uTime.value += dt;
+    for (const monument of this.monuments) {
+      monument.setNext(monument.item === nextMilestone);
+      monument.update(time, dt, camera.position);
     }
-  }
 
-  updateAnimations({ time, dt, nextMilestone }) {
-    this.updateBeacon(dt, nextMilestone);
-    this.updateMonuments(time);
-    this.updateParticles(dt);
+    this.updateStations(time);
+    this.finishPortal?.update(time, dt);
+    this.islands?.userData.update(time, dt);
+    this.unlockEffect?.update(dt);
+    this.updateBeacon(dt, time, nextMilestone);
+    this.updateLightPool(playerPosition);
   }
 }

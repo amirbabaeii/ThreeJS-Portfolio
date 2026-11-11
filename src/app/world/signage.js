@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 
+let inputMode = 'keyboard';
+
+/** Labels say "Tap" on touch devices and "Enter" elsewhere. */
+export function setSignageInputMode(mode) {
+  inputMode = mode === 'touch' ? 'touch' : 'keyboard';
+}
+
 function roundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -18,41 +25,150 @@ function makeCanvasTexture(drawFn, width = 1024, height = 512) {
   drawFn(ctx, width, height);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.userData = { canvas, ctx };
   return texture;
 }
 
-export function makeLabelSprite(title, subtitle, accent) {
-  const texture = makeCanvasTexture((ctx, width, height) => {
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = 'rgba(5, 10, 18, 0.88)';
-    roundedRect(ctx, 18, 18, width - 36, height - 36, 36);
+/** Shrinks the font until the text fits, then draws it. */
+function fitText(ctx, text, x, y, maxWidth, { weight = 700, size = 60, minSize = 26, family = 'Inter, "Segoe UI", system-ui, sans-serif' } = {}) {
+  let fontSize = size;
+
+  do {
+    ctx.font = `${weight} ${fontSize}px ${family}`;
+
+    if (ctx.measureText(text).width <= maxWidth) {
+      break;
+    }
+
+    fontSize -= 2;
+  } while (fontSize > minSize);
+
+  let output = text;
+
+  while (ctx.measureText(output).width > maxWidth && output.length > 4) {
+    output = `${output.slice(0, -2)}…`;
+  }
+
+  ctx.fillText(output, x, y);
+}
+
+function drawLabelCard(ctx, width, height, { eyebrow, title, subtitle, accent, status }) {
+  ctx.clearRect(0, 0, width, height);
+  const pad = 22;
+  const cardWidth = width - pad * 2;
+  const cardHeight = height - pad * 2;
+
+  // Outer glow.
+  ctx.save();
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 26;
+  roundedRect(ctx, pad, pad, cardWidth, cardHeight, 30);
+  const background = ctx.createLinearGradient(0, pad, 0, pad + cardHeight);
+  background.addColorStop(0, 'rgba(10, 18, 34, 0.94)');
+  background.addColorStop(1, 'rgba(4, 8, 18, 0.9)');
+  ctx.fillStyle = background;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = accent;
+  roundedRect(ctx, pad, pad, cardWidth, cardHeight, 30);
+  ctx.stroke();
+
+  // Accent bar.
+  const bar = ctx.createLinearGradient(0, pad + 30, 0, pad + cardHeight - 30);
+  bar.addColorStop(0, accent);
+  bar.addColorStop(1, 'rgba(255,255,255,0.15)');
+  ctx.fillStyle = bar;
+  roundedRect(ctx, pad + 26, pad + 34, 8, cardHeight - 68, 4);
+  ctx.fill();
+
+  const left = pad + 60;
+  const textWidth = cardWidth - 90;
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = accent;
+  ctx.font = '700 26px Inter, "Segoe UI", system-ui, sans-serif';
+  ctx.letterSpacing = '6px';
+  ctx.fillText(eyebrow.toUpperCase(), left, pad + 70);
+  ctx.letterSpacing = '0px';
+
+  ctx.fillStyle = '#f1f8ff';
+  fitText(ctx, title, left, pad + 150, textWidth, { size: 64, minSize: 34 });
+
+  ctx.fillStyle = '#a9c0d6';
+  fitText(ctx, subtitle, left, pad + 205, textWidth, { weight: 500, size: 32, minSize: 22 });
+
+  if (status) {
+    ctx.font = '800 24px Inter, "Segoe UI", system-ui, sans-serif';
+    ctx.letterSpacing = '4px';
+    const chipText = status.text.toUpperCase();
+    const chipWidth = ctx.measureText(chipText).width + 56;
+    const chipY = pad + cardHeight - 76;
+    roundedRect(ctx, left, chipY, chipWidth, 46, 23);
+    ctx.fillStyle = status.filled ? accent : 'rgba(255,255,255,0.06)';
     ctx.fill();
-
+    ctx.lineWidth = 2;
     ctx.strokeStyle = accent;
-    ctx.lineWidth = 8;
-    roundedRect(ctx, 18, 18, width - 36, height - 36, 36);
     ctx.stroke();
+    ctx.fillStyle = status.filled ? '#06121c' : accent;
+    ctx.fillText(chipText, left + 28, chipY + 32);
+    ctx.letterSpacing = '0px';
+  }
+}
 
-    ctx.fillStyle = '#eaf6ff';
-    ctx.font = '700 60px Inter, Arial, sans-serif';
-    ctx.fillText(title, 54, 120);
-
-    ctx.fillStyle = '#a9c0d0';
-    ctx.font = '500 30px Inter, Arial, sans-serif';
-    ctx.fillText(subtitle, 54, 186);
-
-    ctx.fillStyle = accent;
-    ctx.font = '700 26px Inter, Arial, sans-serif';
-    ctx.fillText('ENTER TO INSPECT', 54, 250);
-  });
-
+/**
+ * Billboard info card. Returns a sprite whose `userData.update(next)` redraws
+ * the card in place (used when a monument is unlocked).
+ */
+export function makeLabelSprite({ eyebrow, title, subtitle, accent, status = null }) {
+  const content = { eyebrow, title, subtitle, accent, status };
+  const texture = makeCanvasTexture((ctx, width, height) => drawLabelCard(ctx, width, height, content), 1024, 400);
   const material = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
     depthWrite: false,
   });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(6.6, 3.3, 1);
+  sprite.scale.set(6.8, 6.8 * (400 / 1024), 1);
+  sprite.userData.update = (next) => {
+    Object.assign(content, next);
+    const { canvas, ctx } = texture.userData;
+    drawLabelCard(ctx, canvas.width, canvas.height, content);
+    texture.needsUpdate = true;
+  };
+  return sprite;
+}
+
+export function inspectStatus() {
+  return { text: inputMode === 'touch' ? '◆ Tap to inspect' : '◆ Enter to inspect', filled: false };
+}
+
+export function unlockedStatus() {
+  return { text: '✓ Unlocked', filled: true };
+}
+
+/** Small "CHAPTER 03" plate floating on top of each arch. */
+export function makeChapterSprite(text, accent) {
+  const texture = makeCanvasTexture((ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = 'rgba(6, 12, 24, 0.82)';
+    roundedRect(ctx, 8, 8, width - 16, height - 16, 26);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = accent;
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.font = '800 44px Inter, "Segoe UI", system-ui, sans-serif';
+    ctx.letterSpacing = '10px';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2 + 5, height / 2 + 2);
+  }, 512, 112);
+
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
+  sprite.scale.set(3.4, 3.4 * (112 / 512), 1);
   return sprite;
 }
 
@@ -104,6 +220,10 @@ function makeBrandIconTexture(link) {
     ctx.arc(cx, cy, width * 0.46, 0, Math.PI * 2);
     ctx.fill();
 
+    if (!spec) {
+      return;
+    }
+
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.45)';
     ctx.shadowBlur = 48;
@@ -125,7 +245,7 @@ function makeBrandIconTexture(link) {
     ctx.restore();
 
     drawBrandMark(ctx, spec, width * 0.24, height * 0.24, width * 0.52);
-  }, 1024, 1024);
+  }, 512, 512);
 }
 
 export function make3DIconBadge(link) {
@@ -137,9 +257,9 @@ export function make3DIconBadge(link) {
     new THREE.MeshStandardMaterial({
       color: 0x111b2a,
       emissive: accent,
-      emissiveIntensity: 0.18,
-      metalness: 0.28,
-      roughness: 0.34,
+      emissiveIntensity: 0.25,
+      metalness: 0.7,
+      roughness: 0.28,
     }),
   );
   housing.castShadow = true;
@@ -148,88 +268,44 @@ export function make3DIconBadge(link) {
   const bezel = new THREE.Mesh(
     new THREE.BoxGeometry(1.4, 1.6, 0.06),
     new THREE.MeshStandardMaterial({
-      color: 0x1b2a3d,
-      emissive: accent,
-      emissiveIntensity: 0.08,
-      metalness: 0.32,
-      roughness: 0.42,
-    }),
-  );
-  bezel.position.z = 0.09;
-  bezel.castShadow = true;
-  badge.add(bezel);
-
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.26, 1.46),
-    new THREE.MeshBasicMaterial({
-      map: makeBrandIconTexture(link),
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  screen.position.z = 0.123;
-  badge.add(screen);
-
-  const glass = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.24, 1.44),
-    new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.05,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  glass.position.z = 0.129;
-  badge.add(glass);
-
-  const backLight = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.12, 1.32),
-    new THREE.MeshBasicMaterial({
       color: accent,
-      transparent: true,
-      opacity: 0.08,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  backLight.position.z = -0.115;
-  badge.add(backLight);
-
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.1, 0.56, 18),
-    new THREE.MeshStandardMaterial({
-      color: 0x17253a,
       emissive: accent,
-      emissiveIntensity: 0.12,
+      emissiveIntensity: 1.05,
       metalness: 0.3,
       roughness: 0.4,
     }),
+  );
+  bezel.position.z = 0.09;
+  badge.add(bezel);
+
+  const screen = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.32, 1.52),
+    new THREE.MeshBasicMaterial({
+      map: makeBrandIconTexture(link),
+      transparent: true,
+      depthWrite: false,
+      color: new THREE.Color(1.1, 1.1, 1.1),
+    }),
+  );
+  screen.position.z = 0.125;
+  badge.add(screen);
+
+  const backing = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.32, 1.52),
+    new THREE.MeshBasicMaterial({ color: 0x050a12 }),
+  );
+  backing.position.z = 0.122;
+  badge.add(backing);
+
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.1, 0.56, 18),
+    new THREE.MeshStandardMaterial({ color: 0x17253a, metalness: 0.8, roughness: 0.3 }),
   );
   stem.position.set(0, -1.05, -0.03);
   stem.castShadow = true;
   badge.add(stem);
 
-  const foot = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.44, 0.5, 0.08, 28),
-    new THREE.MeshStandardMaterial({
-      color: 0x0d1522,
-      emissive: accent,
-      emissiveIntensity: 0.18,
-      metalness: 0.26,
-      roughness: 0.35,
-    }),
-  );
-  foot.position.set(0, -1.34, 0);
-  foot.castShadow = true;
-  badge.add(foot);
-
-  const glow = new THREE.PointLight(accent, 3.6, 4.8, 2);
-  glow.position.set(0, 0.18, 1.3);
-  badge.add(glow);
-
   badge.rotation.x = -0.045;
-  badge.userData = { glow, screen };
+  badge.userData = { screen, bezel };
   return badge;
 }

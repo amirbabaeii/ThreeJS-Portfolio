@@ -8,6 +8,13 @@
       name="description"
       content="Amir Babaei, Backend Developer. An interactive Three.js portfolio where my CV becomes a playable mini-game."
     />
+    <meta name="theme-color" content="#02040a" />
+    <!--
+      Linked here (not imported from JS) so it is render-blocking: the styled
+      loading screen shows from the very first paint instead of raw HTML
+      flashing while the JavaScript bundle downloads. Vite bundles it either way.
+    -->
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app">
@@ -17,7 +24,7 @@
         <div class="overlay-card loading-card">
           <div class="eyebrow">Career Odyssey</div>
           <h1>Building the world…</h1>
-          <p id="loadingLabel" class="overlay-copy">Initializing render pipeline</p>
+          <p id="loadingLabel" class="overlay-copy">Loading the engine</p>
           <div class="progress-shell">
             <div id="loadingBar" class="progress-bar"></div>
           </div>
@@ -42,7 +49,7 @@
             </div>
             <div>
               <div class="card-label">Gameplay</div>
-              <p>Responsive movement, smooth camera, interaction prompts, Enter to open links, and a synth soundtrack.</p>
+              <p>Run, sprint and jump through a neon valley. Unlock each chapter, open my profile links, and reach the final gateway. Generative soundtrack included.</p>
             </div>
           </div>
           <div class="button-row">
@@ -51,15 +58,16 @@
               <li><strong>WASD / Arrows</strong>: move</li>
               <li><strong>Shift</strong>: sprint</li>
               <li><strong>Space</strong>: jump</li>
-              <li><strong>Mouse</strong>: orbit camera</li>
+              <li><strong>Mouse drag</strong>: orbit camera</li>
+              <li><strong>Scroll</strong>: zoom</li>
               <li><strong>Enter</strong>: interact</li>
             </ul>
             <ul class="controls-list" data-only="touch">
               <li><strong>Joystick</strong>: drag to move</li>
               <li><strong>⚡ Speed</strong>: hold to sprint</li>
               <li><strong>▲ Jump</strong>: tap to jump</li>
-              <li><strong>Inspect pill</strong>: tap when it appears near a monument</li>
-              <li><strong>Screen swipe</strong>: orbit camera</li>
+              <li><strong>Inspect</strong>: tap the pill near a monument</li>
+              <li><strong>Swipe</strong>: orbit camera</li>
             </ul>
           </div>
         </div>
@@ -91,7 +99,7 @@
           <p id="heroSubtitle" class="subtitle">Senior Backend Developer · Laravel · PHP · Docker · APIs · Automation</p>
           <div class="hero-stats">
             <div class="stat-pill"><span>Unlocked</span><strong id="progressValue">0 / 8</strong></div>
-            <div class="stat-pill"><span>Objective</span><strong id="objectiveValue">Reach the first monument</strong></div>
+            <div class="stat-pill"><span>Objective</span><strong id="objectiveValue">Reach the first monument</strong><em id="objectiveDistance" class="distance-tag hidden"></em></div>
           </div>
         </section>
 
@@ -112,6 +120,7 @@
           <div class="glass-chip" data-only="keyboard">Space Jump</div>
           <div class="glass-chip" data-only="keyboard">Enter Open / Inspect</div>
           <button id="musicToggle" class="glass-chip music-button" type="button">Music On</button>
+          <button id="qualityToggle" class="glass-chip music-button" type="button">Graphics: Auto</button>
           <div id="hintChip" class="glass-chip emphasis-chip">Follow the beam to the next monument.</div>
         </section>
       </div>

@@ -79,6 +79,49 @@ input {
   backdrop-filter: blur(18px);
 }
 
+/* The start screen lets the living world show through behind the card. */
+#startScreen.overlay {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(21, 80, 166, 0.18), transparent 60%),
+    rgba(3, 6, 12, 0.62);
+}
+
+#startScreen .overlay-card {
+  background: linear-gradient(180deg, rgba(8, 14, 24, 0.86), rgba(5, 10, 16, 0.8));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+@media (min-width: 1001px) and (min-aspect-ratio: 13/10) {
+  #startScreen.overlay {
+    place-items: center start;
+    padding-left: clamp(24px, 6vw, 110px);
+    background: linear-gradient(90deg, rgba(3, 6, 12, 0.88) 0%, rgba(3, 6, 12, 0.55) 42%, rgba(3, 6, 12, 0) 72%);
+  }
+
+  #startScreen .overlay-card {
+    width: min(720px, 58vw);
+  }
+}
+
+body.is-touch .glass-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(8, 14, 24, 0.84);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspect-prompt {
+    animation: none;
+  }
+
+  .overlay,
+  .toast,
+  .progress-bar {
+    transition: none;
+  }
+}
+
 .overlay-card h1 {
   margin: 8px 0 14px;
   font-size: clamp(2.2rem, 5vw, 4.8rem);
@@ -108,6 +151,36 @@ input {
   overflow: hidden;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Indeterminate shimmer so the bar looks alive while the bundle downloads. */
+.progress-shell {
+  position: relative;
+}
+
+.progress-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.28), transparent);
+  transform: translateX(-100%);
+  animation: progress-shimmer 1.4s ease-in-out infinite;
+}
+
+.overlay.hidden .progress-shell::after {
+  animation: none;
+}
+
+@keyframes progress-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-shell::after {
+    animation: none;
+  }
 }
 
 .progress-bar {
@@ -151,6 +224,91 @@ input {
   margin: 10px 0 0;
   color: #dff3ff;
   line-height: 1.55;
+}
+
+/*
+ * Compact start card: sized from the viewport height as well as width so the
+ * whole card (title, intro, info boxes, start button, controls) fits without
+ * scrolling on short laptop screens.
+ */
+.start-card {
+  padding: clamp(18px, 3.2vh, 28px) clamp(18px, 2.6vw, 28px);
+}
+
+.start-card h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(2rem, min(5vw, 8vh), 4rem);
+}
+
+.start-card .overlay-copy {
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.start-card .start-grid {
+  margin-top: clamp(12px, 2vh, 18px);
+  gap: 12px;
+}
+
+.start-card .start-grid > div {
+  padding: 12px 16px;
+  border-radius: 16px;
+}
+
+.start-card .start-grid p {
+  margin-top: 6px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.start-card .button-row {
+  margin-top: clamp(14px, 2.2vh, 20px);
+  align-items: center;
+  gap: 14px 18px;
+}
+
+.start-card .button-row .primary-button,
+.start-card .button-row .controls-list {
+  align-self: center;
+}
+
+/* Very short windows (landscape phones, tiny laptop windows, small phones):
+   drop the info boxes, which repeat the intro, so the essentials still fit. */
+@media (max-height: 560px), (max-width: 700px) and (max-height: 640px) {
+  .start-card .start-grid {
+    display: none;
+  }
+
+  .start-card h1 {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .start-card {
+    padding: 18px;
+  }
+
+  .start-card .start-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* The "Experience" box repeats the intro sentence; phones skip it. */
+  .start-card .start-grid > div:first-child {
+    display: none;
+  }
+
+  .start-card .overlay-copy,
+  .start-card .start-grid p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .start-card .controls-list {
+    font-size: 0.86rem;
+    row-gap: 2px;
+    padding: 10px 14px;
+  }
 }
 
 .contact-card {
@@ -272,14 +430,42 @@ input {
   justify-content: space-between;
 }
 
+/*
+ * Backdrop blur over a live WebGL canvas is re-computed every frame for every
+ * blurred element, so only the two large panels blur (lightly); small chips
+ * use a slightly more opaque fill instead.
+ */
 .glass-panel,
 .glass-chip,
 .toast,
 .enter-pill {
   border: 1px solid var(--border);
-  background: var(--panel);
-  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px);
+  background: rgba(8, 14, 24, 0.8);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.glass-panel {
+  background: rgba(8, 14, 24, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.distance-tag {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: #7dd3fc;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.12);
+  border: 1px solid rgba(125, 211, 252, 0.25);
+}
+
+.distance-tag.hidden {
+  display: none;
 }
 
 .hero-panel,
@@ -468,9 +654,8 @@ input {
   inset: 0;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: rgba(8, 14, 24, 0.62);
   box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px);
 }
 
 .joystick-knob {
@@ -521,7 +706,7 @@ input {
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  backdrop-filter: blur(16px);
+  background: rgba(8, 14, 24, 0.72);
   box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   transition: transform 0.12s ease, background 0.18s ease, border-color 0.18s ease;
 }
@@ -555,17 +740,23 @@ input {
 
 .controls-list {
   margin: 0;
-  padding: 14px 18px;
+  padding: 12px 16px;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 4px 22px;
   color: var(--muted);
   border-radius: 16px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
   line-height: 1.5;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 520px) {
+  .controls-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .controls-list li {
@@ -602,7 +793,7 @@ body.is-touch .controls-inline[data-only="touch"] {
 }
 
 body.is-touch .controls-list[data-only="touch"] {
-  display: flex;
+  display: grid;
 }
 
 body.is-touch .mobile-controls {
@@ -680,6 +871,8 @@ body.is-touch .footer-hud {
   right: 10px;
   margin: 0;
   gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
   pointer-events: auto;
   z-index: 9;
 }
@@ -792,7 +985,8 @@ body.is-touch .inspect-prompt__label[data-only="touch"] {
   }
 }
 
-.hud.details-open ~ .inspect-prompt {
+.hud.details-open ~ .inspect-prompt,
+#app:has(.overlay.visible) .inspect-prompt {
   display: none;
 }
 
@@ -847,7 +1041,7 @@ body.is-touch #app:has(.overlay.visible) .footer-hud {
   }
 
   .controls-list[data-only="touch"] {
-    display: flex;
+    display: grid;
   }
 
   .mobile-controls {
