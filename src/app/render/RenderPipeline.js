@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { POST_CONFIG, QUALITY_TIERS, RENDERER_CONFIG } from '../config.js';
+import { DEFAULT_QUALITY_MODE, POST_CONFIG, QUALITY_TIERS, RENDERER_CONFIG } from '../config.js';
 
 const QUALITY_STORAGE_KEY = 'career-odyssey.quality';
 const QUALITY_MODES = ['auto', 'high', 'medium', 'low'];
@@ -135,8 +135,11 @@ export class RenderPipeline {
   constructor(canvas) {
     const storedMode = readStoredMode();
     const autoTierId = detectTierId();
+    const urlMode = new URLSearchParams(window.location.search).get('quality');
 
-    this.mode = storedMode ?? 'auto';
+    // Priority: ?quality= in the URL, then the visitor's saved choice, then
+    // the default (Low). Visitors can switch with the HUD Graphics button.
+    this.mode = QUALITY_MODES.includes(urlMode) ? urlMode : storedMode ?? DEFAULT_QUALITY_MODE;
     this.autoTierId = autoTierId;
     const initialTier = QUALITY_TIERS[this.mode === 'auto' ? autoTierId : this.mode];
 
@@ -239,7 +242,9 @@ export class RenderPipeline {
     this.mode = mode;
     storeMode(mode);
     this.pixelRatioCeiling = Infinity;
-    this.applyTier(QUALITY_TIERS[mode === 'auto' ? this.autoTierId : mode]);
+    // force: notify listeners even when the tier is unchanged (e.g. Auto·High
+    // -> High) so the HUD label always reflects the selected mode.
+    this.applyTier(QUALITY_TIERS[mode === 'auto' ? this.autoTierId : mode], { force: true });
   }
 
   applyTier(tier, { force = false } = {}) {

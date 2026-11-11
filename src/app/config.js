@@ -3,6 +3,12 @@ export const RENDERER_CONFIG = {
 };
 
 /**
+ * Graphics mode used on a first visit (before the visitor picks one with the
+ * HUD button): 'low' | 'medium' | 'high' | 'auto'.
+ */
+export const DEFAULT_QUALITY_MODE = 'low';
+
+/**
  * Graphics tiers. The QualityManager picks one at boot from device hints and
  * can step down at runtime when the frame rate stays low. Players can also
  * force a tier from the HUD.

@@ -55,8 +55,9 @@ On touch devices, use the joystick, the sprint and jump buttons, and the Inspect
 
 ## Graphics options
 
-- Click the **Graphics** chip in the HUD to cycle Auto → High → Medium → Low (remembered between visits)
-- Or force a tier with a URL parameter: `?quality=low`, `?quality=medium`, `?quality=high`
+- First visits start on **Low** (change `DEFAULT_QUALITY_MODE` in `src/app/config.js`)
+- Click the **Graphics** chip in the HUD to cycle Low → Auto → High → Medium (remembered between visits)
+- Or force a mode with a URL parameter: `?quality=low`, `?quality=medium`, `?quality=high`, `?quality=auto`
 - `?debug` exposes the app instance as `window.__careerOdyssey` for inspection in the console
 
 ## Run locally
